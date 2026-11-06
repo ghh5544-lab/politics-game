@@ -80,8 +80,8 @@ select{background:var(--panel);border:1px solid var(--line);border-radius:8px;pa
 #fb{position:absolute;left:12px;right:12px;bottom:14px;z-index:7;background:rgba(10,17,24,.92);border:1px solid var(--line);border-radius:8px;padding:8px 12px;font-size:13px;display:none}
 #fb.ok{border-color:var(--ok)}
 #fb.bad{border-color:var(--bad)}
-.ov{position:absolute;inset:0;z-index:10;background:rgba(10,17,24,.93);display:flex;align-items:center;justify-content:center;padding:18px;cursor:default;overflow-y:auto}
-.ov .box{max-width:560px;width:100%;display:flex;flex-direction:column;gap:12px}
+.ov{position:absolute;inset:0;z-index:10;background:rgba(10,17,24,.93);display:flex;align-items:flex-start;justify-content:center;padding:18px;cursor:default;overflow-y:auto}
+.ov .box{max-width:560px;width:100%;display:flex;flex-direction:column;gap:12px;margin:auto}
 .ov h2{font-family:var(--f-display);font-weight:400;font-size:clamp(24px,4.5vw,32px);margin:0;line-height:1.15}
 .ov p{margin:0;color:var(--mute)}
 .ov ul{margin:0;padding-left:18px;color:var(--fg);font-size:13.5px}
@@ -97,6 +97,22 @@ select{background:var(--panel);border:1px solid var(--line);border-radius:8px;pa
 .notes div:last-child{border-bottom:0}
 .notes b{color:var(--accent)}
 .foot{color:var(--mute);font-size:12px}
+.fld{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--mute)}
+.fld input{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 12px;min-height:44px;color:var(--fg);font:inherit;font-size:16px}
+.fld input:focus-visible{outline:2px solid var(--ice);outline-offset:2px}
+.err{color:var(--bad);font-size:13px;min-height:1.3em}
+.me-line{font-size:13px;color:var(--mute)}
+.me-line b{color:var(--ice)}
+.lbtabs{display:flex;flex-wrap:wrap;gap:6px}
+.lbtabs .tab{min-height:36px;padding:6px 10px;font-size:13px}
+table.lb{width:100%;border-collapse:collapse;font-size:13.5px}
+table.lb th{white-space:nowrap;text-align:left;font-weight:500;color:var(--mute);font-size:12px;padding:4px 8px;border-bottom:1px solid var(--line)}
+table.lb td{padding:7px 8px;border-bottom:1px solid var(--line)}
+table.lb td.n{font-family:var(--f-mono);font-variant-numeric:tabular-nums;text-align:right}
+table.lb th.n{text-align:right}
+table.lb tr.me td{background:rgba(124,196,255,.12)}
+table.lb td.rk{font-family:var(--f-display);width:2.4em}
+table.lb tr.r1 td.rk{color:#ffd24d}table.lb tr.r2 td.rk{color:#d5dde6}table.lb tr.r3 td.rk{color:#e29a5c}
 @media (max-width:560px){.board{grid-template-columns:1fr}.hud{text-align:left}.lives{justify-content:flex-start}.tgt{font-size:13.5px;padding:8px 10px}}
 @media (prefers-reduced-motion:reduce){.ping,.pop{animation-duration:.01s}}
 </style>
@@ -106,7 +122,7 @@ select{background:var(--panel);border:1px solid var(--line);border-radius:8px;pa
   <header>
     <div>
       <h1>정치 조준 훈련소</h1>
-      <p class="sub">국제 사회와 정치 · 4단원 통합 학습지 기반 시안</p>
+      <p class="sub">국제 사회와 정치 · 4단원 통합 학습지 기반</p>
     </div>
     <div class="ctl">
       <label for="unit" class="foot">범위</label>
@@ -117,6 +133,7 @@ select{background:var(--panel);border:1px solid var(--line);border-radius:8px;pa
         <option value="3">3. 우리나라의 국제 관계와 외교</option>
         <option value="4">4. 국제 사회의 갈등과 세계시민</option>
       </select>
+      <button class="btn ghost" id="hofbtn" style="min-height:40px;padding:8px 14px">명예의 전당</button>
     </div>
   </header>
 
@@ -150,7 +167,7 @@ select{background:var(--panel);border:1px solid var(--line);border-radius:8px;pa
   <div class="row">
     <button class="btn ghost" id="quit" hidden>그만하기</button>
   </div>
-  <p class="foot">시안입니다. 문제는 학습지에 나온 용어와 정의, OX 퀴즈 40문항만 사용합니다. 도구는 레이저 포인터입니다.</p>
+  <p class="foot">문제는 학습지에 나온 용어와 정의, OX 퀴즈 40문항만 사용합니다. 기록은 학번·이름과 함께 명예의 전당에 올라갑니다.</p>
 </div>
 
 <script>
@@ -163,9 +180,13 @@ var store={
   get:function(k,d){try{var v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch(e){return d;}},
   set:function(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
 };
+/* 명예의 전당 서버 주소: 비워 두면 이 기기에서만 기록이 보입니다. (Apps Script 웹 앱 주소를 넣으면 전체 학생 공통 순위) */
+var LB_URL='';
+var MASK_NAME=true;
+var player=store.get('jb-player',null);
 var SLOW=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches?0.5:1;
 
-/* ---------- 데이터: [단원, 묶음, 용어, 초성, 정의] ---------- */
+/* ---------- 데이터: [단원, 묶음, 용어, (미사용), 정의] ---------- */
 var RAW=[
 [1,'hist','베스트팔렌 조약','ㅂㅅㅌㅍㄹ ㅈㅇ','1648년 30년 전쟁을 끝내며 유럽 각국이 영토적 주권과 통치권을 인정받아 근대적 주권 국가 체제를 확립한 조약'],
 [1,'hist','국제 연맹','ㄱㅈ ㅇㅁ','제1차 세계 대전 이후 창설되었으나 강대국의 불참·탈퇴로 실질적 영향력을 갖지 못한 국제기구'],
@@ -279,7 +300,7 @@ var G={mode:'aim',unit:0,running:false};
 var weak=store.get('jb-weak',{});
 var best=store.get('jb-best',{aim:0,ox:0,wave:0});
 var MODES={
-  aim:{name:'조준 서바이벌',desc:'정의와 초성이 나오면 떠다니는 용어 과녁 중 정답을 조준해 쏘세요. 정중앙을 맞히면 보너스, 제한 시간이 지나도 목숨이 줄어듭니다.',tips:['목숨 3개, 연속 정답 콤보로 점수 배율 상승','틀린 용어는 오답노트에 쌓이고 더 자주 출제']},
+  aim:{name:'조준 서바이벌',desc:'정의가 나오면 떠다니는 용어 과녁 중 정답을 조준해 쏘세요. 정중앙을 맞히면 보너스, 제한 시간이 지나도 목숨이 줄어듭니다.',tips:['목숨 3개, 연속 정답 콤보로 점수 배율 상승','틀린 용어는 오답노트에 쌓이고 더 자주 출제']},
   ox:{name:'OX 사격장',desc:'문장이 참이면 O, 거짓이면 X를 쏘세요. 과녁이 빠르게 움직이니 읽고 바로 판단해야 합니다.',tips:['학습지 OX 40문항과 용어 바꿔치기 문장이 섞여 나옵니다','콤보가 쌓일수록 제한 시간이 줄어듭니다']},
   wave:{name:'오개념 격파',desc:'문장 카드가 기지를 향해 내려옵니다. 틀린 문장만 쏘아 격파하세요. 옳은 문장을 쏘면 감점, 틀린 문장이 기지에 닿으면 목숨이 줄어듭니다.',tips:['웨이브는 총 4단계, 갈수록 빨라집니다','옳은 문장은 그냥 통과시키면 됩니다']}
 };
@@ -301,7 +322,7 @@ function distractors(t,n){
 function makeAim(avoid){
   var t=pickTerm(avoid);
   var opts=shuffle([t].concat(distractors(t,4))).map(function(x){return {id:x.id,label:x.name};});
-  return {t:t,q:t.def,hint:t.init,answer:t.id,opts:opts,explain:'정답: '+t.name};
+  return {t:t,q:t.def,hint:'',answer:t.id,opts:opts,explain:'정답: '+t.name};
 }
 function makeOX(){
   var curated=OXQ.filter(function(r){return G.unit===0||r[0]===G.unit;});
@@ -352,6 +373,87 @@ function clearField(){
 }
 function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
 
+
+/* ---------- 학번·이름, 기록, 명예의 전당 ---------- */
+var MODE_NAME={aim:'조준 서바이벌',ox:'OX 사격장',wave:'오개념 격파'};
+var UNIT_NAME=['전체','1단원','2단원','3단원','4단원'];
+function maskName(n){n=String(n);if(n.length<=1)return n;if(n.length===2)return n.charAt(0)+'○';return n.charAt(0)+new Array(n.length-1).join('○')+n.charAt(n.length-1);}
+function upsert(list,rec){
+  function put(kind,better){
+    var i=-1;
+    for(var k=0;k<list.length;k++){if(String(list[k].id)===rec.id&&list[k].mode===rec.mode&&list[k].kind===kind){i=k;break;}}
+    var row={id:rec.id,name:rec.name,mode:rec.mode,kind:kind,score:rec.score,time:rec.time,unit:rec.unit};
+    if(i<0)list.push(row);else if(better(list[i]))list[i]=row;
+  }
+  put('score',function(o){return rec.score>o.score;});
+  if(rec.mode==='wave'&&rec.cleared)put('time',function(o){return rec.time<o.time;});
+}
+function submitRecord(rec){
+  var list=store.get('jb-lb',[]);upsert(list,rec);store.set('jb-lb',list);
+  if(!LB_URL)return Promise.resolve('local');
+  try{
+    return fetch(LB_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(rec)})
+      .then(function(){return 'sent';}).catch(function(){return 'fail';});
+  }catch(e){return Promise.resolve('fail');}
+}
+function loadBoard(){
+  if(!LB_URL)return Promise.resolve({rows:store.get('jb-lb',[]),remote:false});
+  return fetch(LB_URL+'?t='+Date.now()).then(function(r){return r.json();})
+    .then(function(rows){return {rows:rows,remote:true};})
+    .catch(function(){return {rows:store.get('jb-lb',[]),remote:false,failed:true};});
+}
+function showLogin(msg){
+  G.running=false;cancelAnimationFrame(G.raf);clearField();$('#quit').hidden=true;
+  ov.style.display='flex';
+  ov.innerHTML='<div class="box"><h2>출전 등록</h2><p>학번과 이름을 입력하면 내 기록이 명예의 전당에 올라갑니다.</p>'+
+   '<label class="fld">학번 (숫자 4~5자리, 예: 20301)<input id="pid" inputmode="numeric" maxlength="5" autocomplete="off" value="'+(player?esc(player.id):'')+'"></label>'+
+   '<label class="fld">이름 (한글)<input id="pnm" maxlength="5" autocomplete="off" value="'+(player?esc(player.name):'')+'"></label>'+
+   '<div class="err" id="perr">'+(msg?esc(msg):'')+'</div>'+
+   '<div class="row"><button class="btn" id="preg">등록하고 입장</button><button class="btn ghost" id="phof">명예의 전당 보기</button></div></div>';
+  $('#preg').onclick=function(){
+    var id=$('#pid').value.trim(),nm=$('#pnm').value.trim();
+    if(!/^[0-9]{4,5}$/.test(id)){$('#perr').textContent='학번은 숫자 4~5자리로 입력하세요.';return;}
+    if(!/^[가-힣]{2,5}$/.test(nm)){$('#perr').textContent='이름은 한글 2~5자로 입력하세요.';return;}
+    player={id:id,name:nm};store.set('jb-player',player);showStart();
+  };
+  $('#phof').onclick=function(){showHall('aim:score');};
+  $('#pnm').addEventListener('keydown',function(e){if(e.key==='Enter')$('#preg').click();});
+}
+var HOF_TABS=[['aim:score','조준 점수'],['ox:score','OX 점수'],['wave:score','격파 점수'],['wave:time','격파 최단시간']];
+function showHall(tab){
+  if(G.running)return;
+  tab=tab||'aim:score';
+  var mode=tab.split(':')[0],kind=tab.split(':')[1];
+  ov.style.display='flex';
+  ov.innerHTML='<div class="box"><h2>명예의 전당</h2><div class="lbtabs">'+
+    HOF_TABS.map(function(t){return '<button class="tab" data-t="'+t[0]+'" aria-pressed="'+(t[0]===tab?'true':'false')+'">'+t[1]+'</button>';}).join('')+
+    '</div><div id="lbbody"><p>불러오는 중…</p></div><div class="row"><button class="btn ghost" id="hback">돌아가기</button></div></div>';
+  Array.prototype.forEach.call(ov.querySelectorAll('.lbtabs .tab'),function(b){b.onclick=function(){showHall(b.dataset.t);};});
+  $('#hback').onclick=function(){if(player)showStart();else showLogin();};
+  loadBoard().then(function(res){
+    var box=$('#lbbody');if(!box)return;
+    var rows=res.rows.filter(function(r){return r.mode===mode&&r.kind===kind;});
+    rows.sort(function(a,b){
+      if(kind==='time')return (a.time-b.time)||(b.score-a.score);
+      return (b.score-a.score)||((a.time||0)-(b.time||0));
+    });
+    var note=res.remote?'':'<p class="foot">'+(res.failed?'서버에 연결하지 못해 이 기기의 기록만 보여 줍니다.':'이 기기에서 한 기록만 표시됩니다.')+'</p>';
+    if(!rows.length){box.innerHTML='<p>아직 기록이 없습니다. 첫 번째 주인공이 되어 보세요.</p>'+note;return;}
+    var meId=player?player.id:'';
+    var top=rows.slice(0,15);
+    var meIdx=rows.findIndex(function(r){return String(r.id)===meId;});
+    function line(r,i){
+      var me=String(r.id)===meId;
+      var nm=me?r.name+' (나)':(MASK_NAME?maskName(r.name):r.name);
+      var val=kind==='time'?(Number(r.time).toFixed(1)+'초'):r.score;
+      return '<tr class="'+(me?'me ':'')+(i<3?'r'+(i+1):'')+'"><td class="rk">'+(i+1)+'</td><td>'+esc(r.id)+'</td><td>'+esc(nm)+'</td><td class="n">'+esc(val)+'</td><td>'+esc(UNIT_NAME[+r.unit]||'')+'</td></tr>';
+    }
+    var h='<table class="lb"><thead><tr><th>순위</th><th>학번</th><th>이름</th><th class="n">'+(kind==='time'?'클리어 시간':'점수')+'</th><th>범위</th></tr></thead><tbody>'+
+      top.map(line).join('')+(meIdx>=15?'<tr><td colspan="5" class="foot">…</td></tr>'+line(rows[meIdx],meIdx):'')+'</tbody></table>';
+    box.innerHTML=h+note+'<p class="foot">같은 학번은 모드별 최고 기록만 남습니다.</p>';
+  });
+}
+
 /* ---------- 오답노트 ---------- */
 function notesHtml(){
   var ids=Object.keys(weak).filter(function(k){return weak[k]>0;}).sort(function(a,b){return weak[b]-weak[a];}).slice(0,10);
@@ -361,14 +463,17 @@ function notesHtml(){
 
 /* ---------- 오버레이 ---------- */
 function showStart(){
+  if(!player){showLogin();return;}
   G.running=false;cancelAnimationFrame(G.raf);clearField();
   $('#quit').hidden=true;
   var m=MODES[G.mode];
   var wk=Object.keys(weak).filter(function(k){return weak[k]>0;}).length;
   ov.style.display='flex';
-  ov.innerHTML='<div class="box"><h2>'+m.name+'</h2><p>'+m.desc+'</p><ul>'+m.tips.map(function(t){return '<li>'+t+'</li>';}).join('')+'</ul>'+
+  ov.innerHTML='<div class="box"><h2>'+m.name+'</h2><div class="me-line">출전: <b>'+esc(player.id)+' '+esc(player.name)+'</b> · <a href="#" id="chg" style="color:var(--mute)">변경</a></div><p>'+m.desc+'</p><ul>'+m.tips.map(function(t){return '<li>'+t+'</li>';}).join('')+'</ul>'+
    '<div class="stats"><div><b>'+(best[G.mode]||0)+'</b><span>최고 점수</span></div><div><b>'+wk+'</b><span>오답노트 용어</span></div></div>'+
-   '<div class="row"><button class="btn" id="go">시작</button><button class="btn ghost" id="nt">오답노트 보기</button></div><div id="ntbox"></div></div>';
+   '<div class="row"><button class="btn" id="go">시작</button><button class="btn ghost" id="nt">오답노트 보기</button><button class="btn ghost" id="hof2">명예의 전당</button></div><div id="ntbox"></div></div>';
+  $('#chg').onclick=function(e){e.preventDefault();showLogin();};
+  $('#hof2').onclick=function(){showHall(G.mode==='wave'?'wave:score':G.mode+':score');};
   $('#go').onclick=startGame;
   $('#nt').onclick=function(){var b=$('#ntbox');b.innerHTML=b.innerHTML?'':notesHtml();};
   $('#qlabel').textContent='MISSION';$('#qtext').textContent='시작을 누르면 훈련이 시작됩니다.';$('#hint').textContent='';
@@ -378,6 +483,7 @@ function showStart(){
 }
 function showResult(cleared){
   G.running=false;cancelAnimationFrame(G.raf);clearField();$('#quit').hidden=true;
+  var elapsed=Math.round((performance.now()-G.t0)/100)/10;
   var prev=best[G.mode]||0, isBest=G.score>prev;
   if(isBest){best[G.mode]=G.score;store.set('jb-best',best);}
   store.set('jb-weak',weak);
@@ -386,15 +492,23 @@ function showResult(cleared){
   ov.style.display='flex';
   ov.innerHTML='<div class="box"><h2>'+(cleared?'작전 성공':'훈련 종료')+'</h2>'+
    '<div class="stats"><div><b>'+G.score+'</b><span>점수'+(isBest?' (최고 기록)':'')+'</span></div><div><b>'+G.maxCombo+'</b><span>최대 콤보</span></div><div><b>'+acc+'%</b><span>명중률</span></div></div>'+
+   (cleared&&G.mode==='wave'?'<p>클리어 시간 <b style="color:var(--ice)">'+elapsed.toFixed(1)+'초</b></p>':'')+'<p class="foot" id="subst"></p>'+
    (miss?'<p>다시 볼 내용</p><div class="notes">'+miss+'</div>':'<p>틀린 문제가 없습니다.</p>')+
    '<div class="row"><button class="btn" id="again">다시 하기</button><button class="btn ghost" id="home">모드 선택</button></div></div>';
   $('#again').onclick=startGame;$('#home').onclick=showStart;
+  if(player&&G.score>0){
+    $('#subst').textContent='기록 저장 중…';
+    submitRecord({id:player.id,name:player.name,mode:G.mode,unit:G.unit,score:G.score,time:elapsed,cleared:!!cleared}).then(function(st){
+      var el=$('#subst');if(!el)return;
+      el.textContent=st==='sent'?'기록을 명예의 전당에 올렸습니다.':st==='local'?'기록을 이 기기에 저장했습니다.':'서버 전송에 실패했습니다. 이 기기에는 저장되었습니다.';
+    });
+  }
   $('#qtext').textContent='훈련이 끝났습니다.';$('#hint').textContent='';
 }
 
 /* ---------- 게임 시작 ---------- */
 function startGame(){
-  G.score=0;G.combo=0;G.maxCombo=0;G.lives=3;G.shots=0;G.hits=0;G.missed=[];G.round=0;G.locked=false;G.running=true;G.last=performance.now();
+  G.score=0;G.combo=0;G.maxCombo=0;G.lives=3;G.shots=0;G.hits=0;G.missed=[];G.round=0;G.locked=false;G.running=true;G.last=performance.now();G.t0=G.last;
   ov.style.display='none';clearField();hud();$('#quit').hidden=false;
   arena.classList.toggle('wave',G.mode==='wave');
   $('#rdl').textContent=G.mode==='wave'?'웨이브':'문항';
@@ -585,6 +699,7 @@ document.querySelectorAll('.tab').forEach(function(b){
   });
 });
 $('#unit').addEventListener('change',function(e){G.unit=+e.target.value;if(!G.running)showStart();else showStart();});
+$('#hofbtn').addEventListener('click',function(){showHall(G.mode==='wave'?'wave:score':G.mode+':score');});
 $('#quit').addEventListener('click',function(){if(G.running)showResult(false);});
 showStart();
 })();
