@@ -1,0 +1,593 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>정치 조준 훈련소</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Noto+Sans+KR:wght@400;500;700&family=JetBrains+Mono:wght@500;700&display=swap">
+<style>
+/* Layout: 관제실 화면 — 상단 상황판(문제·HUD), 중앙 사격 구역(arena), 오버레이로 시작/결과 */
+:root{
+  --bg:#0a1118; --panel:#111c27; --panel2:#17273a; --line:#26405c;
+  --fg:#e8eef6; --mute:#8fa5bb; --accent:#ff7a3d; --ice:#7cc4ff;
+  --ok:#3ddc97; --bad:#ff5d6c;
+  --f-display:'Black Han Sans','Noto Sans KR',sans-serif;
+  --f-body:'Noto Sans KR',system-ui,sans-serif;
+  --f-mono:'JetBrains Mono',ui-monospace,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{min-height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:15px;line-height:1.55;margin:0;
+  padding-block:16px 28px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:980px;margin:0 auto;display:flex;flex-direction:column;gap:12px}
+header{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:flex-end;justify-content:space-between}
+h1{font-family:var(--f-display);font-weight:400;font-size:clamp(26px,5vw,38px);line-height:1.1;margin:0;letter-spacing:.01em;text-wrap:balance}
+.sub{color:var(--mute);font-size:13px;margin:4px 0 0}
+.ctl{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+select,button{font:inherit;color:var(--fg)}
+select{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-height:40px}
+.tabs{display:flex;flex-wrap:wrap;gap:6px}
+.tab{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px 14px;min-height:40px;cursor:pointer;font-weight:700}
+.tab[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#1b0d05}
+.tab:focus-visible,select:focus-visible,.btn:focus-visible{outline:2px solid var(--ice);outline-offset:2px}
+.board{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px;display:grid;grid-template-columns:1fr auto;gap:10px 18px;align-items:start}
+.qwrap{min-width:0}
+.qlabel{font-family:var(--f-mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--mute)}
+#qtext{font-size:clamp(16px,2.6vw,20px);font-weight:700;margin:4px 0 0;min-height:3.1em;text-wrap:pretty}
+#hint{font-family:var(--f-mono);font-weight:700;font-size:20px;letter-spacing:.18em;color:var(--accent);margin-top:6px;min-height:1.5em}
+.hud{display:grid;grid-template-columns:repeat(3,auto);gap:4px 16px;text-align:right}
+.hud div{min-width:0}
+.hud b{display:block;font-family:var(--f-mono);font-size:22px;font-variant-numeric:tabular-nums}
+.hud span{font-size:11px;color:var(--mute)}
+.lives{display:flex;gap:5px;justify-content:flex-end;margin-top:6px;grid-column:1/-1}
+.lives i{width:22px;height:8px;border-radius:2px;background:var(--bad)}
+.lives i.off{background:var(--line)}
+.bar{grid-column:1/-1;height:6px;background:var(--panel2);border-radius:3px;overflow:hidden}
+#bar{height:100%;width:100%;background:var(--ice);transform-origin:left;transition:background .2s}
+#bar.low{background:var(--bad)}
+.arena{position:relative;height:clamp(380px,60vh,540px);border:1px solid var(--line);border-radius:12px;overflow:hidden;
+  background:
+   radial-gradient(circle at 50% 50%,transparent 0 22%,rgba(124,196,255,.07) 22.4% 22.8%,transparent 23% 44%,rgba(124,196,255,.07) 44.4% 44.8%,transparent 45%),
+   linear-gradient(var(--panel2),var(--bg));
+  cursor:none;touch-action:manipulation;user-select:none;-webkit-user-select:none}
+.arena::before{content:"";position:absolute;left:50%;top:0;bottom:0;width:1px;background:rgba(124,196,255,.1)}
+.arena::after{content:"";position:absolute;top:50%;left:0;right:0;height:1px;background:rgba(124,196,255,.1)}
+.tgt{position:absolute;left:0;top:0;max-width:46%;padding:10px 14px;border-radius:10px;background:var(--panel);border:1.5px solid var(--ice);
+  font-weight:700;font-size:15px;line-height:1.35;z-index:2;will-change:transform;text-align:center}
+.tgt.ox{min-width:96px;font-family:var(--f-display);font-weight:400;font-size:44px;line-height:1;padding:18px 26px;border-radius:50%;max-width:none}
+.tgt.ox.o{border-color:var(--ok);color:var(--ok)}
+.tgt.ox.x{border-color:var(--bad);color:var(--bad)}
+.tgt.right{background:var(--ok);border-color:var(--ok);color:#06210f}
+.tgt.wrong{background:var(--bad);border-color:var(--bad);color:#2a0409}
+.card{position:absolute;left:0;top:0;width:min(230px,58%);padding:10px 12px;border-radius:8px;background:var(--panel);border:1.5px solid var(--mute);
+  font-size:13.5px;line-height:1.4;font-weight:500;z-index:2;will-change:transform}
+.card.right{background:var(--ok);border-color:var(--ok);color:#06210f}
+.card.wrong{background:var(--bad);border-color:var(--bad);color:#2a0409}
+.card.gone{opacity:0;transition:opacity .25s}
+.baseline{position:absolute;left:0;right:0;bottom:0;height:8px;background:repeating-linear-gradient(90deg,var(--accent) 0 14px,transparent 14px 22px);opacity:.55;z-index:1;display:none}
+.arena.wave .baseline{display:block}
+#cross{position:absolute;left:0;top:0;width:36px;height:36px;margin:-18px 0 0 -18px;pointer-events:none;z-index:5;display:none}
+#cross::before,#cross::after{content:"";position:absolute;background:var(--accent)}
+#cross::before{left:17px;top:0;width:2px;height:36px}
+#cross::after{top:17px;left:0;height:2px;width:36px}
+#cross i{position:absolute;inset:8px;border:2px solid var(--accent);border-radius:50%}
+.ping{position:absolute;width:12px;height:12px;margin:-6px 0 0 -6px;border:2px solid var(--accent);border-radius:50%;pointer-events:none;z-index:4;animation:ping .45s ease-out forwards}
+@keyframes ping{to{transform:scale(4);opacity:0}}
+.pop{position:absolute;font-family:var(--f-mono);font-weight:700;pointer-events:none;z-index:6;animation:pop .8s ease-out forwards}
+@keyframes pop{to{transform:translateY(-34px);opacity:0}}
+#fb{position:absolute;left:12px;right:12px;bottom:14px;z-index:7;background:rgba(10,17,24,.92);border:1px solid var(--line);border-radius:8px;padding:8px 12px;font-size:13px;display:none}
+#fb.ok{border-color:var(--ok)}
+#fb.bad{border-color:var(--bad)}
+.ov{position:absolute;inset:0;z-index:10;background:rgba(10,17,24,.93);display:flex;align-items:center;justify-content:center;padding:18px;cursor:default;overflow-y:auto}
+.ov .box{max-width:560px;width:100%;display:flex;flex-direction:column;gap:12px}
+.ov h2{font-family:var(--f-display);font-weight:400;font-size:clamp(24px,4.5vw,32px);margin:0;line-height:1.15}
+.ov p{margin:0;color:var(--mute)}
+.ov ul{margin:0;padding-left:18px;color:var(--fg);font-size:13.5px}
+.row{display:flex;flex-wrap:wrap;gap:8px}
+.btn{background:var(--accent);color:#1b0d05;border:0;border-radius:8px;padding:11px 20px;min-height:44px;font-weight:700;cursor:pointer}
+.btn.ghost{background:transparent;color:var(--fg);border:1px solid var(--line)}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px}
+.stats div{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+.stats b{display:block;font-family:var(--f-mono);font-size:20px;font-variant-numeric:tabular-nums}
+.stats span{font-size:11px;color:var(--mute)}
+.notes{max-height:200px;overflow-y:auto;border:1px solid var(--line);border-radius:8px;padding:8px 12px;font-size:13px;background:var(--panel)}
+.notes div{padding:5px 0;border-bottom:1px solid var(--line)}
+.notes div:last-child{border-bottom:0}
+.notes b{color:var(--accent)}
+.foot{color:var(--mute);font-size:12px}
+@media (max-width:560px){.board{grid-template-columns:1fr}.hud{text-align:left}.lives{justify-content:flex-start}.tgt{font-size:13.5px;padding:8px 10px}}
+@media (prefers-reduced-motion:reduce){.ping,.pop{animation-duration:.01s}}
+</style>
+
+</head><body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>정치 조준 훈련소</h1>
+      <p class="sub">국제 사회와 정치 · 4단원 통합 학습지 기반 시안</p>
+    </div>
+    <div class="ctl">
+      <label for="unit" class="foot">범위</label>
+      <select id="unit">
+        <option value="0">전체 (1~4단원)</option>
+        <option value="1">1. 국제 사회의 이해</option>
+        <option value="2">2. 국제 문제와 행위 주체</option>
+        <option value="3">3. 우리나라의 국제 관계와 외교</option>
+        <option value="4">4. 국제 사회의 갈등과 세계시민</option>
+      </select>
+    </div>
+  </header>
+
+  <div class="tabs" role="group" aria-label="게임 모드">
+    <button class="tab" data-mode="aim" aria-pressed="true">조준 서바이벌</button>
+    <button class="tab" data-mode="ox" aria-pressed="false">OX 사격장</button>
+    <button class="tab" data-mode="wave" aria-pressed="false">오개념 격파</button>
+  </div>
+
+  <section class="board" aria-live="polite">
+    <div class="qwrap">
+      <div class="qlabel" id="qlabel">MISSION</div>
+      <p id="qtext">모드를 고르고 시작을 누르세요.</p>
+      <div id="hint"></div>
+    </div>
+    <div class="hud">
+      <div><b id="sc">0</b><span>점수</span></div>
+      <div><b id="cb">0</b><span>콤보</span></div>
+      <div><b id="rd">-</b><span id="rdl">문항</span></div>
+      <div class="lives" id="lives" aria-label="남은 목숨"></div>
+    </div>
+    <div class="bar"><div id="bar"></div></div>
+  </section>
+
+  <div class="arena" id="arena">
+    <div class="baseline"></div>
+    <div id="cross"><i></i></div>
+    <div id="fb"></div>
+    <div class="ov" id="ov"></div>
+  </div>
+  <div class="row">
+    <button class="btn ghost" id="quit" hidden>그만하기</button>
+  </div>
+  <p class="foot">시안입니다. 문제는 학습지에 나온 용어와 정의, OX 퀴즈 40문항만 사용합니다. 도구는 레이저 포인터입니다.</p>
+</div>
+
+<script>
+(function(){
+'use strict';
+var $=function(s){return document.querySelector(s);};
+var rnd=function(a,b){return a+Math.random()*(b-a);};
+var shuffle=function(a){a=a.slice();for(var i=a.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=a[i];a[i]=a[j];a[j]=t;}return a;};
+var store={
+  get:function(k,d){try{var v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch(e){return d;}},
+  set:function(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
+};
+var SLOW=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches?0.5:1;
+
+/* ---------- 데이터: [단원, 묶음, 용어, 초성, 정의] ---------- */
+var RAW=[
+[1,'hist','베스트팔렌 조약','ㅂㅅㅌㅍㄹ ㅈㅇ','1648년 30년 전쟁을 끝내며 유럽 각국이 영토적 주권과 통치권을 인정받아 근대적 주권 국가 체제를 확립한 조약'],
+[1,'hist','국제 연맹','ㄱㅈ ㅇㅁ','제1차 세계 대전 이후 창설되었으나 강대국의 불참·탈퇴로 실질적 영향력을 갖지 못한 국제기구'],
+[1,'hist','국제 연합','ㄱㅈ ㅇㅎ','제2차 세계 대전 이후 국제 연맹의 한계를 보완하여 창설된 국제기구'],
+[1,'hist','냉전','ㄴㅈ','미국 중심의 자본주의 진영과 소련 중심의 공산주의 진영이 이념적으로 대립한 상태'],
+[1,'hist','트루먼 독트린','ㅌㄹㅁ ㄷㅌㄹ','1947년 미국이 공산주의 세력의 확대를 막으려고 그리스·터키의 반공 정부에 군사·경제 원조를 제공하겠다고 밝힌 선언'],
+[1,'hist','북대서양 조약 기구','ㅂㄷㅅㅇ ㅈㅇ ㄱㄱ','미국 등 서방 진영이 결성한 군사 동맹 기구'],
+[1,'hist','바르샤바 조약 기구','ㅂㄹㅅㅂ ㅈㅇ ㄱㄱ','소련을 포함한 동유럽 공산권이 결성한 군사 동맹 기구'],
+[1,'hist','닉슨 독트린','ㄴㅅ ㄷㅌㄹ','1969년 미국이 아시아 지역에 대한 군사적 개입을 줄이겠다고 밝혀 냉전 완화의 계기가 된 선언'],
+[1,'hist','몰타 회담','ㅁㅌ ㅎㄷ','1989년 미국과 소련의 정상이 만나 냉전의 종식을 공식 선언한 회담'],
+[1,'view','세력 균형 정책','ㅅㄹ ㄱㅎ ㅈㅊ','동맹 등으로 힘의 균형을 유지해야 전쟁을 억제할 수 있다고 보는 현실주의의 평화 전략'],
+[1,'view','집단 안전 보장 체제','ㅈㄷ ㅇㅈ ㅂㅈ ㅊㅈ','국제기구·국제법을 활용해 국가들이 함께 힘을 모아 확립하는, 자유주의가 강조하는 평화 체제'],
+[1,'view','현실주의','ㅎㅅㅈㅇ','국가는 이기적인 인간들이 모인 존재이므로 자국의 이익을 최우선으로 추구하며 국가 간 갈등이 필연적이라고 보는 관점'],
+[1,'view','자유주의','ㅈㅇㅈㅇ','국가는 인간의 이성에 대한 신뢰를 바탕으로 서로 협력할 수 있는 존재라고 보는 관점'],
+[1,'now','국제 관계','ㄱㅈ ㄱㄱ','국가, 국제기구, 다국적 기업 등 다양한 행위 주체가 여러 영역에서 상호 작용하며 만들어 내는 관계들의 총체'],
+[1,'now','무정부성','ㅁㅈㅂㅅ','국가 간의 분쟁을 조정하고 문제를 해결할, 강제력을 지닌 정부가 국제 사회에 존재하지 않는 특징'],
+[1,'now','지역 블록화','ㅈㅇ ㅂㄹㅎ','지리적으로 가깝고 경제적 상호 의존도가 높은 국가들이 경제 공동체를 형성하는 현상'],
+[1,'now','탈세계화','ㅌㅅㄱㅎ','국제 사회에서 국가 간의 교류가 오히려 줄어들고 상호 의존성이 약해지는 현상'],
+[1,'now','내정 간섭','ㄴㅈ ㄱㅅ','다른 국가의 국내 문제에 강제로 개입하는 것'],
+[1,'now','힘의 논리','ㅎㅇ ㄴㄹ','주권 평등의 원칙에도 불구하고 실제로는 강대국의 뜻이 더 크게 반영되는 현상'],
+[1,'now','유럽 연합','ㅇㄹ ㅇㅎ','유럽의 여러 국가가 정치·경제적으로 통합하여 만든 대표적인 지역 국제기구'],
+[1,'now','동남아시아 국가 연합','ㄷㄴㅇㅅㅇ ㄱㄱ ㅇㅎ','동남아시아 국가들이 결성한 지역 국제기구'],
+[2,'org','정부 간 국제기구','ㅈㅂ ㄱ ㄱㅈㄱㄱ','정부(국가)를 회원으로 하는 국제기구'],
+[2,'org','국제 비정부 기구','ㄱㅈ ㅂㅈㅂ ㄱㄱ','개인이나 민간단체가 중심이 되어 만든 국제기구'],
+[2,'org','안전 보장 이사회','ㅇㅈ ㅂㅈ ㅇㅅㅎ','5개 상임 이사국과 10개 비상임 이사국으로 구성되어 국제 연합의 실질적인 의사 결정을 담당하는 기관'],
+[2,'org','국제 사법 재판소','ㄱㅈ ㅅㅂ ㅈㅍㅅ','국제법에 따라 국가 간 분쟁을 해결하는 국제 연합의 사법 기관'],
+[2,'power','권고적 효력','ㄱㄱㅈ ㅎㄹ','국제 연합 총회의 의결이 갖는, 회원국을 강제로 따르게 하지는 못하는 효력'],
+[2,'power','거부권','ㄱㅂㄱ','안전 보장 이사회에서 5개 상임 이사국 중 한 곳이라도 반대하면 안건이 부결되게 만드는 권한'],
+[2,'law','조약','ㅈㅇ','국가나 국제기구가 서로 맺은, 법적 구속력을 지닌 문서 형식의 합의'],
+[2,'law','국제 관습법','ㄱㅈ ㄱㅅㅂ','국제 사회에서 오랫동안 반복된 관행이 법적 효력을 갖게 된 규범'],
+[2,'law','입법 기관의 부재','ㅇㅂ ㄱㄱ ㅂㅈㅈ','국제 사회에 국내처럼 법을 만드는 기관이 따로 없다는 국제법의 한계'],
+[2,'law','법적 실효성의 부재','ㅂㅈ ㅅㅎㅅ ㅂㅈㅈ','국제법을 어겨도 경찰처럼 강제로 집행할 방법이 없다는 국제법의 한계'],
+[2,'prob','국제 문제','ㄱㅈ ㅁㅈ','전쟁과 테러, 환경 문제, 인권 문제, 경제 문제 등 국가 간 또는 국제 사회 전체에서 발생하는 문제'],
+[2,'prob','테러','ㅌㄹ','국가나 단체가 상대방을 위협하여 정치적 목적을 이루려는 폭력 행위'],
+[2,'prob','난민','ㄴㅁ','전쟁·박해·자연재해 등을 피해 다른 나라로 떠나는 사람들'],
+[3,'view','지정학적 관점','ㅈㅈㅎㅈ ㄱㅈ','지리적 요인을 중심으로 국제 관계를 이해하려는 관점'],
+[3,'view','역사적 관점','ㅇㅅㅈ ㄱㅈ','시대적 배경과 맥락에 초점을 맞추어 국제 관계의 변화를 이해하려는 관점'],
+[3,'view','경제적 관점','ㄱㅈㅈ ㄱㅈ','경제적 요인에 초점을 맞추어 국가 간의 관계를 이해하려는 관점'],
+[3,'term','전략적 요충지','ㅈㄹㅈ ㅇㅊㅈ','여러 세력이 눈독을 들이는, 지리적으로 중요한 위치에 있는 지역'],
+[3,'term','위안부 문제','ㅇㅇㅂ ㅁㅈ','일제가 강제로 동원한 여성들에게 인권 침해를 가한, 일본이 책임을 인정하지 않고 있는 역사 문제'],
+[3,'term','동북 공정','ㄷㅂ ㄱㅈ','중국 정부가 고조선·고구려·발해의 역사를 자국의 역사로 편입하려 한 연구 사업'],
+[3,'term','수입 의존도','ㅅㅇ ㅇㅈㄷ','한 나라가 필요한 에너지·자원 등을 다른 나라로부터 얼마나 많이 들여오는지를 나타내는 정도'],
+[3,'term','대외 의존도','ㄷㅇ ㅇㅈㄷ','한 나라의 경제가 다른 나라와의 무역 등 대외 관계에 얼마나 많이 기대고 있는지를 나타내는 정도'],
+[3,'dip','외교','ㅇㄱ','한 국가가 자국의 이익을 실현하고자 국제 사회에서 평화적인 방법으로 펼치는 모든 대외 활동'],
+[3,'dip','공공 외교','ㄱㄱ ㅇㄱ','외국 국민과 직접 소통하며 우리나라에 대한 공감대를 넓히고 국가 브랜드를 높이는 외교 활동'],
+[3,'dip','하드 파워','ㅎㄷ ㅍㅇ','군사적 개입, 경제 제재 같은 물리적 힘으로 표현되는 전통 외교의 힘'],
+[3,'dip','소프트 파워','ㅅㅍㅌ ㅍㅇ','문화·매력 등으로 상대가 자발적으로 지지하게 만드는, 공공 외교가 중시하는 힘'],
+[3,'dip','외교 다변화','ㅇㄱ ㄷㅂㅎ','세계 여러 국가와의 외교를 넓혀 협력 범위를 확대하는 것'],
+[3,'dip','공적 개발 원조','ㄱㅈ ㄱㅂ ㅇㅈ','선진국이 개발 도상국의 경제·사회 발전을 위해 제공하는 원조'],
+[4,'cause','영토 분쟁','ㅇㅌ ㅂㅈ','국경선을 두고 국가 간에 벌어지는, 국제 갈등 중 가장 물리적 충돌로 이어지기 쉬운 다툼'],
+[4,'cause','자원 분쟁','ㅈㅇ ㅂㅈ','석유·희귀 광물 등 국가가 보유한 자원이 원인이 되어 발생하는 갈등'],
+[4,'cause','자원 민족주의','ㅈㅇ ㅁㅈㅈㅇ','자원이 풍부한 국가가 그 자원을 정치적 수단으로 이용하는 태도'],
+[4,'cause','종교 분쟁','ㅈㄱ ㅂㅈ','자신의 종교에만 충실하려는 배타성과 근본주의 때문에 벌어지는 갈등'],
+[4,'cause','근본주의','ㄱㅂㅈㅇ','자기 종교만 옳다고 여겨 다른 종교를 배척하려는 태도'],
+[4,'solve','외교적 해결','ㅇㄱㅈ ㅎㄱ','분쟁 당사국끼리 자율적으로 원칙·절차에 합의하고 협상하여 해결책을 마련하는 방식'],
+[4,'solve','법적 해결','ㅂㅈ ㅎㄱ','국제 사법 재판소 등 국제기구가 국제법에 따라 분쟁을 해결하는 방식'],
+[4,'solve','대안적 해결','ㄷㅇㅈ ㅎㄱ','국제기구의 중재·조정 등을 활용해 신속하게 분쟁을 해결하는 방식'],
+[4,'glob','지속가능발전 목표','ㅈㅅㄱㄴㅂㅈ ㅁㅍ','빈곤·기후변화 등에 대응하기 위해 국제 연합이 정한 17가지 목표'],
+[4,'glob','세계시민','ㅅㄱㅅㅁ','개별 국가의 국민이면서 동시에 세계 공동체의 구성원이라는 정체성을 지닌 사람'],
+[4,'glob','세계시민 의식','ㅅㄱㅅㅁ ㅇㅅ','국가의 경계를 넘어서는 세계 공동체의 구성원으로서 권리와 의무가 있다고 인식하는 것']
+];
+var TERMS=RAW.map(function(r,i){return {id:i,unit:r[0],g:r[0]+r[1],name:r[2],init:r[3],def:r[4]};});
+
+/* 학습지 OX 퀴즈 40문항 (정답 포함) */
+var OXQ=[
+[1,'국제 사회에는 국가 간 분쟁을 조정할 강제력을 지닌 정부가 존재한다.',false],
+[1,'베스트팔렌 조약의 체결로 주권 국가 중심의 새로운 국제 질서가 형성되었다.',true],
+[1,'국제 연맹(LN)은 강대국의 불참과 탈퇴 없이 성공적으로 운영되었다.',false],
+[1,'지역 블록화는 지리적으로 가깝고 경제적 상호 의존도가 높은 국가들이 경제 공동체를 형성하는 현상이다.',true],
+[1,'현실주의 관점은 국제기구와 국제법의 역할을 중시하며 집단 안전 보장 체제를 강조한다.',false],
+[1,'자유주의 관점은 인간의 이성에 대한 신뢰를 바탕으로 평화 실현이 가능하다고 본다.',true],
+[1,'국제 정치를 올바르게 이해하려면 현실주의와 자유주의 중 하나의 관점만을 철저히 따라야 한다.',false],
+[1,'21세기 미국과 중국의 경쟁은 경제적·외교적 측면에서 나타나고 있다는 평가가 있다.',true],
+[1,'국제 연맹(LN)은 국제 연합(UN)보다 강력한 실질적 영향력을 행사하였다.',false],
+[1,'닉슨 독트린은 냉전을 심화시키는 계기가 되었다.',false],
+[2,'국제 문제는 한 나라의 노력만으로도 쉽게 해결될 수 있다.',false],
+[2,'테러는 무장하지 않은 민간인을 공격하는 경우가 많아 국제적으로 심각한 문제가 되고 있다.',true],
+[2,'정부 간 국제기구(IGO)는 개인과 민간단체를 가입 주체로 한다.',false],
+[2,'국제 연합 안전 보장 이사회의 상임 이사국은 거부권을 가진다.',true],
+[2,'국제 연합 총회의 의결은 법적 구속력을 지닌다.',false],
+[2,'조약은 국가나 국제기구가 상호 간에 체결한 법적 구속력이 있는 합의이다.',true],
+[2,'국제 사법 재판소는 분쟁 당사국이 동의하지 않아도 강제로 재판을 열 수 있다.',false],
+[2,'코로나19와 같은 감염병 확산은 국제 문제로 다뤄질 수 있다.',true],
+[2,'니카라과 대 미국 사건에서 미국은 국제 사법 재판소의 판결을 그대로 따랐다.',false],
+[2,'우리나라에서 중요한 조약은 대통령이 비준하기 전에 국회의 동의를 받아야 한다.',true],
+[3,'우리나라는 반도국으로서 대륙과 해양 진출에 유리한 지정학적 위치에 있다.',true],
+[3,'중국의 동북 공정은 고조선, 고구려, 발해의 역사를 자국의 역사로 편입하려는 시도이다.',true],
+[3,'국제 관계는 한 가지 관점만으로 정확하게 파악할 수 있다.',false],
+[3,'오늘날에는 개인, 사회 집단 등 민간 차원의 국제적 교류도 외교로 본다.',true],
+[3,'공공 외교는 하드 파워보다 소프트 파워를 중시한다.',true],
+[3,'다자 외교란 두 나라가 1대1로 관계를 맺는 외교이다.',false],
+[3,'우리나라는 공적 개발 원조(ODA)를 받기만 할 뿐 제공한 적은 없다.',false],
+[3,'2018년 남북 정상 회담에서 판문점 선언이 발표되었으나 이후 북미 정상 회담 결렬로 평화 체제 논의가 정체되었다.',true],
+[3,'7광구를 둘러싼 문제는 지정학적 관점과 경제적 관점이 함께 얽혀 있는 사례이다.',true],
+[3,'우리나라는 세계 여권 순위에서 매우 높은 순위를 기록하고 있다.',true],
+[4,'국제 사회에는 강제력을 지닌 정부가 존재하지 않아 갈등이 장기화하는 경향이 있다.',true],
+[4,'자원이 풍부한 국가들이 자원을 정치적 수단으로 이용하는 것을 자원 민족주의라고 한다.',true],
+[4,'종교 분쟁은 민족, 문화, 영토 등 다른 갈등 요소와 얽히면 해결이 더 쉬워진다.',false],
+[4,'외교적 해결은 분쟁 당사국끼리 자율적으로 협상하여 해결책을 마련하는 방식이다.',true],
+[4,'지속가능발전목표(SDGs)는 미래 세대는 고려하지 않고 현재 세대의 필요만을 충족하는 목표이다.',false],
+[4,'세계시민 의식은 국가의 경계를 넘어 세계 공동체의 구성원으로서 권리와 의무가 있다고 인식하는 것이다.',true],
+[4,'쿠르드족은 튀르키예, 시리아, 이라크, 이란 등지에 흩어져 살고 있으며 독립 국가를 수립하지 못했다.',true],
+[4,'콩고 내전은 다이아몬드·콜탄 등 풍부한 자원의 채굴권을 둘러싼 대표적인 자원 분쟁 사례이다.',true],
+[4,'공정 무역 제품을 구매하는 것도 세계시민 실천의 한 사례로 볼 수 있다.',true],
+[4,'이스라엘-팔레스타인 분쟁은 영토 문제일 뿐 종교나 민족과는 관련이 없다.',false]
+];
+
+/* ---------- 상태 ---------- */
+var arena=$('#arena'), ov=$('#ov'), cross=$('#cross'), fb=$('#fb');
+var G={mode:'aim',unit:0,running:false};
+var weak=store.get('jb-weak',{});
+var best=store.get('jb-best',{aim:0,ox:0,wave:0});
+var MODES={
+  aim:{name:'조준 서바이벌',desc:'정의와 초성이 나오면 떠다니는 용어 과녁 중 정답을 조준해 쏘세요. 정중앙을 맞히면 보너스, 제한 시간이 지나도 목숨이 줄어듭니다.',tips:['목숨 3개, 연속 정답 콤보로 점수 배율 상승','틀린 용어는 오답노트에 쌓이고 더 자주 출제']},
+  ox:{name:'OX 사격장',desc:'문장이 참이면 O, 거짓이면 X를 쏘세요. 과녁이 빠르게 움직이니 읽고 바로 판단해야 합니다.',tips:['학습지 OX 40문항과 용어 바꿔치기 문장이 섞여 나옵니다','콤보가 쌓일수록 제한 시간이 줄어듭니다']},
+  wave:{name:'오개념 격파',desc:'문장 카드가 기지를 향해 내려옵니다. 틀린 문장만 쏘아 격파하세요. 옳은 문장을 쏘면 감점, 틀린 문장이 기지에 닿으면 목숨이 줄어듭니다.',tips:['웨이브는 총 4단계, 갈수록 빨라집니다','옳은 문장은 그냥 통과시키면 됩니다']}
+};
+
+function inUnit(t){return G.unit===0||t.unit===G.unit;}
+function pickTerm(avoidId){
+  var pool=TERMS.filter(function(t){return inUnit(t)&&t.id!==avoidId;});
+  var tot=0,w=pool.map(function(t){var x=1+2*(weak[t.id]||0);tot+=x;return x;});
+  var r=Math.random()*tot;
+  for(var i=0;i<pool.length;i++){r-=w[i];if(r<=0)return pool[i];}
+  return pool[pool.length-1];
+}
+function distractors(t,n){
+  var same=shuffle(TERMS.filter(function(x){return x.id!==t.id&&x.g===t.g;}));
+  var unit=shuffle(TERMS.filter(function(x){return x.id!==t.id&&x.g!==t.g&&x.unit===t.unit;}));
+  var all=shuffle(TERMS.filter(function(x){return x.id!==t.id&&x.unit!==t.unit;}));
+  return same.concat(unit,all).slice(0,n);
+}
+function makeAim(avoid){
+  var t=pickTerm(avoid);
+  var opts=shuffle([t].concat(distractors(t,4))).map(function(x){return {id:x.id,label:x.name};});
+  return {t:t,q:t.def,hint:t.init,answer:t.id,opts:opts,explain:'정답: '+t.name};
+}
+function makeOX(){
+  var curated=OXQ.filter(function(r){return G.unit===0||r[0]===G.unit;});
+  var q;
+  if(Math.random()<0.5&&curated.length){
+    var r=curated[Math.floor(Math.random()*curated.length)];
+    q={text:r[1],a:r[2],t:null,explain:r[2]?'옳은 문장입니다.':'틀린 문장입니다.'};
+  }else{
+    var t=pickTerm(-1);
+    if(Math.random()<0.5){
+      q={text:'「'+t.def+'」 = 「'+t.name+'」',a:true,t:t,explain:'옳은 문장입니다.'};
+    }else{
+      var d=distractors(t,2)[0];
+      q={text:'「'+t.def+'」 = 「'+d.name+'」',a:false,t:t,explain:'틀린 문장입니다. 이 정의는 「'+t.name+'」입니다.'};
+    }
+  }
+  return {t:q.t,q:q.text,hint:'',answer:q.a?'O':'X',opts:[{id:'O',label:'O'},{id:'X',label:'X'}],explain:q.explain,raw:q};
+}
+function makeStatement(wantFalse){
+  for(var i=0;i<40;i++){
+    var q=makeOX();
+    if((q.answer==='X')===wantFalse)return q;
+  }
+  return makeOX();
+}
+
+/* ---------- 화면 공통 ---------- */
+function setLives(n){
+  var h='';for(var i=0;i<3;i++)h+='<i class="'+(i<n?'':'off')+'"></i>';
+  $('#lives').innerHTML=h;
+}
+function hud(){
+  $('#sc').textContent=G.score||0;
+  $('#cb').textContent=G.combo||0;
+  setLives(G.lives===undefined?3:G.lives);
+}
+function setBar(p){var b=$('#bar');b.style.transform='scaleX('+Math.max(0,p)+')';b.className=p<0.3?'low':'';}
+function pop(x,y,text,color){
+  var d=document.createElement('div');d.className='pop';d.textContent=text;
+  d.style.left=x+'px';d.style.top=y+'px';d.style.color=color;arena.appendChild(d);
+  setTimeout(function(){d.remove();},850);
+}
+function say(text,kind){fb.textContent=text;fb.className=kind;fb.style.display='block';}
+function hideFb(){fb.style.display='none';}
+function clearField(){
+  Array.prototype.slice.call(arena.querySelectorAll('.tgt,.card,.pop,.ping')).forEach(function(e){e.remove();});
+  hideFb();
+}
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+
+/* ---------- 오답노트 ---------- */
+function notesHtml(){
+  var ids=Object.keys(weak).filter(function(k){return weak[k]>0;}).sort(function(a,b){return weak[b]-weak[a];}).slice(0,10);
+  if(!ids.length)return '<div class="notes"><div>아직 오답노트가 비어 있습니다.</div></div>';
+  return '<div class="notes">'+ids.map(function(k){var t=TERMS[+k];return '<div><b>'+esc(t.name)+'</b> ('+weak[k]+'회) '+esc(t.def)+'</div>';}).join('')+'</div>';
+}
+
+/* ---------- 오버레이 ---------- */
+function showStart(){
+  G.running=false;cancelAnimationFrame(G.raf);clearField();
+  $('#quit').hidden=true;
+  var m=MODES[G.mode];
+  var wk=Object.keys(weak).filter(function(k){return weak[k]>0;}).length;
+  ov.style.display='flex';
+  ov.innerHTML='<div class="box"><h2>'+m.name+'</h2><p>'+m.desc+'</p><ul>'+m.tips.map(function(t){return '<li>'+t+'</li>';}).join('')+'</ul>'+
+   '<div class="stats"><div><b>'+(best[G.mode]||0)+'</b><span>최고 점수</span></div><div><b>'+wk+'</b><span>오답노트 용어</span></div></div>'+
+   '<div class="row"><button class="btn" id="go">시작</button><button class="btn ghost" id="nt">오답노트 보기</button></div><div id="ntbox"></div></div>';
+  $('#go').onclick=startGame;
+  $('#nt').onclick=function(){var b=$('#ntbox');b.innerHTML=b.innerHTML?'':notesHtml();};
+  $('#qlabel').textContent='MISSION';$('#qtext').textContent='시작을 누르면 훈련이 시작됩니다.';$('#hint').textContent='';
+  setBar(1);G.score=0;G.combo=0;G.lives=3;hud();$('#rd').textContent='-';
+  arena.classList.toggle('wave',G.mode==='wave');
+  $('#rdl').textContent=G.mode==='wave'?'웨이브':'문항';
+}
+function showResult(cleared){
+  G.running=false;cancelAnimationFrame(G.raf);clearField();$('#quit').hidden=true;
+  var prev=best[G.mode]||0, isBest=G.score>prev;
+  if(isBest){best[G.mode]=G.score;store.set('jb-best',best);}
+  store.set('jb-weak',weak);
+  var acc=G.shots?Math.round(100*G.hits/G.shots):0;
+  var miss=G.missed.slice(0,6).map(function(m){return '<div>'+esc(m)+'</div>';}).join('');
+  ov.style.display='flex';
+  ov.innerHTML='<div class="box"><h2>'+(cleared?'작전 성공':'훈련 종료')+'</h2>'+
+   '<div class="stats"><div><b>'+G.score+'</b><span>점수'+(isBest?' (최고 기록)':'')+'</span></div><div><b>'+G.maxCombo+'</b><span>최대 콤보</span></div><div><b>'+acc+'%</b><span>명중률</span></div></div>'+
+   (miss?'<p>다시 볼 내용</p><div class="notes">'+miss+'</div>':'<p>틀린 문제가 없습니다.</p>')+
+   '<div class="row"><button class="btn" id="again">다시 하기</button><button class="btn ghost" id="home">모드 선택</button></div></div>';
+  $('#again').onclick=startGame;$('#home').onclick=showStart;
+  $('#qtext').textContent='훈련이 끝났습니다.';$('#hint').textContent='';
+}
+
+/* ---------- 게임 시작 ---------- */
+function startGame(){
+  G.score=0;G.combo=0;G.maxCombo=0;G.lives=3;G.shots=0;G.hits=0;G.missed=[];G.round=0;G.locked=false;G.running=true;G.last=performance.now();
+  ov.style.display='none';clearField();hud();$('#quit').hidden=false;
+  arena.classList.toggle('wave',G.mode==='wave');
+  $('#rdl').textContent=G.mode==='wave'?'웨이브':'문항';
+  if(G.mode==='wave'){G.wave=1;beginWave();}else nextQ();
+  cancelAnimationFrame(G.raf);G.raf=requestAnimationFrame(tick);
+}
+function loseLife(){
+  G.lives--;G.combo=0;hud();
+  return G.lives<=0;
+}
+
+/* ---------- 조준·OX 모드 ---------- */
+function nextQ(){
+  if(!G.running)return;
+  clearField();G.locked=false;G.round++;
+  $('#rd').textContent=G.round;
+  var q=G.mode==='aim'?makeAim(G.q&&G.q.t?G.q.t.id:-1):makeOX();
+  G.q=q;
+  $('#qlabel').textContent=G.mode==='aim'?'정의에 해당하는 용어를 쏘세요':'참이면 O, 거짓이면 X';
+  $('#qtext').textContent=q.q;$('#hint').textContent=q.hint;
+  G.timeMax=Math.max(G.mode==='aim'?6:5,(G.mode==='aim'?14:11)-Math.floor(G.combo/3));
+  G.timeLeft=G.timeMax;
+  var W=arena.clientWidth,H=arena.clientHeight;
+  G.targets=q.opts.map(function(o,i){
+    var el=document.createElement('div');
+    el.className='tgt'+(G.mode==='ox'?' ox '+o.id.toLowerCase():'');
+    el.textContent=o.label;el.dataset.id=o.id;
+    arena.appendChild(el);
+    var w=el.offsetWidth,h=el.offsetHeight;
+    var sp=(G.mode==='ox'?95:50)*SLOW*(1+Math.min(G.combo,15)*0.04);
+    var ang=rnd(0,6.283);
+    var t={el:el,id:o.id,w:w,h:h,x:rnd(8,Math.max(10,W-w-8)),y:rnd(8,Math.max(10,H-h-70)),vx:Math.cos(ang)*sp+Math.sign(Math.cos(ang))*20,vy:Math.sin(ang)*sp+Math.sign(Math.sin(ang))*20};
+    el.style.transform='translate('+t.x+'px,'+t.y+'px)';
+    return t;
+  });
+  if(G.mode==='ox'&&G.targets.length===2){
+    G.targets[0].x=W*0.2;G.targets[1].x=W*0.62;
+  }
+}
+function updateAim(dt){
+  if(G.locked)return;
+  var W=arena.clientWidth,H=arena.clientHeight;
+  G.targets.forEach(function(t){
+    t.x+=t.vx*dt;t.y+=t.vy*dt;
+    if(t.x<0){t.x=0;t.vx=Math.abs(t.vx);}
+    if(t.x>W-t.w){t.x=W-t.w;t.vx=-Math.abs(t.vx);}
+    if(t.y<0){t.y=0;t.vy=Math.abs(t.vy);}
+    if(t.y>H-t.h-4){t.y=H-t.h-4;t.vy=-Math.abs(t.vy);}
+    t.el.style.transform='translate('+t.x+'px,'+t.y+'px)';
+  });
+  G.timeLeft-=dt;setBar(G.timeLeft/G.timeMax);
+  if(G.timeLeft<=0)resolve(null,null);
+}
+function resolve(id,pt){
+  if(G.locked)return;
+  G.locked=true;
+  var q=G.q,ok=(id!==null&&id===q.answer);
+  G.targets.forEach(function(t){
+    if(t.id===q.answer)t.el.classList.add('right');
+    else if(t.id===id)t.el.classList.add('wrong');
+  });
+  if(ok){
+    var gain=100+G.combo*10;
+    var bonus=0;
+    if(pt){
+      var tg=G.targets.filter(function(t){return t.id===id;})[0];
+      var cx=tg.x+tg.w/2,cy=tg.y+tg.h/2;
+      if(Math.hypot(pt.x-cx,pt.y-cy)<Math.min(tg.w,tg.h)*0.3){bonus=50;}
+    }
+    G.score+=gain+bonus;G.combo++;G.hits++;G.maxCombo=Math.max(G.maxCombo,G.combo);
+    say((bonus?'정중앙! +'+bonus+' · ':'')+'정답 +'+gain+' · '+q.explain,'ok');
+    hud();setTimeout(nextQ,G.mode==='ox'?650:800);
+  }else{
+    if(q.t)weak[q.t.id]=(weak[q.t.id]||0)+1;
+    G.missed.push(G.mode==='aim'?q.q+' → '+q.t.name:q.q+' ('+(q.answer==='O'?'O':'X')+')');
+    var dead=loseLife();
+    say((id===null?'시간 초과 · ':'오답 · ')+q.explain,'bad');
+    setTimeout(function(){if(dead)showResult(false);else nextQ();},1900);
+  }
+}
+
+/* ---------- 웨이브 모드 ---------- */
+function beginWave(){
+  G.spawn=0;G.perWave=6+G.wave*2;G.spawnT=1.2;G.cards=[];G.pause=1.6;
+  $('#rd').textContent=G.wave+' / 4';
+  $('#qlabel').textContent='WAVE '+G.wave;
+  $('#qtext').textContent='틀린 문장만 쏘세요. 옳은 문장은 통과시키면 됩니다.';
+  $('#hint').textContent='';
+  setBar(1);
+  say('WAVE '+G.wave+' 시작 · 카드 '+G.perWave+'장','ok');
+  setTimeout(hideFb,1400);
+}
+function spawnCard(){
+  var q=makeStatement(Math.random()<0.55);
+  var el=document.createElement('div');el.className='card';el.textContent=q.q;
+  arena.appendChild(el);
+  var W=arena.clientWidth;
+  var c={el:el,q:q,w:el.offsetWidth,h:el.offsetHeight,x:0,y:-el.offsetHeight-4,v:(34+G.wave*9+rnd(0,14))*SLOW,dead:false};
+  c.x=rnd(6,Math.max(8,W-c.w-6));
+  el.style.transform='translate('+c.x+'px,'+c.y+'px)';
+  G.cards.push(c);
+}
+function removeCard(c){
+  c.dead=true;c.el.classList.add('gone');
+  setTimeout(function(){c.el.remove();},260);
+}
+function updateWave(dt){
+  if(G.pause>0){G.pause-=dt;return;}
+  var H=arena.clientHeight;
+  if(G.spawn<G.perWave){
+    G.spawnT-=dt;
+    if(G.spawnT<=0){spawnCard();G.spawn++;G.spawnT=Math.max(1.5,3.2-G.wave*0.35)+rnd(0,0.8);}
+  }
+  G.cards.forEach(function(c){
+    if(c.dead)return;
+    c.y+=c.v*dt;
+    c.el.style.transform='translate('+c.x+'px,'+c.y+'px)';
+    if(c.y+c.h>=H-8){
+      if(c.q.answer==='X'){
+        G.missed.push(c.q.q+' (X) — 놓친 틀린 문장');
+        if(c.q.t)weak[c.q.t.id]=(weak[c.q.t.id]||0)+1;
+        c.el.classList.add('wrong');say('틀린 문장이 기지에 도달했습니다. '+c.q.explain,'bad');
+        setTimeout(hideFb,1800);
+        if(loseLife()){removeCard(c);G.cards=G.cards.filter(function(k){return !k.dead;});showResult(false);return;}
+      }
+      removeCard(c);
+    }
+  });
+  G.cards=G.cards.filter(function(c){return !c.dead;});
+  if(!G.running)return;
+  setBar(1-(G.spawn-G.cards.length)/G.perWave);
+  if(G.spawn>=G.perWave&&G.cards.length===0){
+    if(G.wave>=4){G.score+=200;showResult(true);return;}
+    G.score+=100;G.wave++;hud();beginWave();
+  }
+}
+function shootCard(c,pt){
+  if(c.dead)return;
+  G.shots++;
+  if(c.q.answer==='X'){
+    var gain=100+G.combo*10;G.score+=gain;G.combo++;G.hits++;G.maxCombo=Math.max(G.maxCombo,G.combo);
+    c.el.classList.add('right');pop(pt.x,pt.y,'+'+gain,'var(--ok)');
+  }else{
+    G.score=Math.max(0,G.score-50);G.combo=0;
+    G.missed.push(c.q.q+' (O) — 옳은 문장을 쏨');
+    c.el.classList.add('wrong');pop(pt.x,pt.y,'-50','var(--bad)');
+  }
+  hud();removeCard(c);
+}
+
+/* ---------- 루프·입력 ---------- */
+function tick(ts){
+  if(!G.running)return;
+  var dt=Math.min(0.05,(ts-G.last)/1000);G.last=ts;
+  if(G.mode==='wave')updateWave(dt);else updateAim(dt);
+  if(G.running)G.raf=requestAnimationFrame(tick);
+}
+function localPt(e){var r=arena.getBoundingClientRect();return {x:e.clientX-r.left,y:e.clientY-r.top};}
+arena.addEventListener('pointermove',function(e){
+  if(e.pointerType==='touch')return;
+  var p=localPt(e);cross.style.display='block';cross.style.transform='translate('+p.x+'px,'+p.y+'px)';
+});
+arena.addEventListener('pointerleave',function(){cross.style.display='none';});
+arena.addEventListener('pointerdown',function(e){
+  if(!G.running||ov.style.display!=='none')return;
+  var p=localPt(e);
+  var ring=document.createElement('div');ring.className='ping';ring.style.left=p.x+'px';ring.style.top=p.y+'px';arena.appendChild(ring);
+  setTimeout(function(){ring.remove();},500);
+  if(G.mode==='wave'){
+    var cardEl=e.target.closest&&e.target.closest('.card');
+    if(cardEl){
+      var c=G.cards.filter(function(k){return k.el===cardEl;})[0];
+      if(c)shootCard(c,p);
+    }else{G.shots++;}
+    return;
+  }
+  if(G.locked)return;
+  G.shots++;
+  var te=e.target.closest&&e.target.closest('.tgt');
+  if(te){resolve(te.dataset.id,p);}
+  else{G.combo=0;hud();pop(p.x,p.y,'빗나감','var(--mute)');}
+});
+document.querySelectorAll('.tab').forEach(function(b){
+  b.addEventListener('click',function(){
+    G.mode=b.dataset.mode;
+    document.querySelectorAll('.tab').forEach(function(x){x.setAttribute('aria-pressed',x===b?'true':'false');});
+    showStart();
+  });
+});
+$('#unit').addEventListener('change',function(e){G.unit=+e.target.value;if(!G.running)showStart();else showStart();});
+$('#quit').addEventListener('click',function(){if(G.running)showResult(false);});
+showStart();
+})();
+</script>
+</body>
+</html>
