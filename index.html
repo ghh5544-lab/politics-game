@@ -562,10 +562,20 @@ function nextQ(){
     el.style.transform='translate('+t.x+'px,'+t.y+'px)';
     return t;
   });
+  G.targets.forEach(function(t,i){
+    for(var k=0;k<120;k++){
+      var bad=false;
+      for(var j=0;j<i;j++){if(ovl(t,G.targets[j],10)){bad=true;break;}}
+      if(!bad)break;
+      t.x=rnd(8,Math.max(10,W-t.w-8));t.y=rnd(8,Math.max(10,H-t.h-70));
+    }
+    t.el.style.transform='translate('+t.x+'px,'+t.y+'px)';
+  });
   if(G.mode==='ox'&&G.targets.length===2){
     G.targets[0].x=W*0.2;G.targets[1].x=W*0.62;
   }
 }
+function ovl(a,b,m){return a.x<b.x+b.w+m&&a.x+a.w+m>b.x&&a.y<b.y+b.h+m&&a.y+a.h+m>b.y;}
 function updateAim(dt){
   if(G.locked)return;
   var W=arena.clientWidth,H=arena.clientHeight;
@@ -575,6 +585,17 @@ function updateAim(dt){
     if(t.x>W-t.w){t.x=W-t.w;t.vx=-Math.abs(t.vx);}
     if(t.y<0){t.y=0;t.vy=Math.abs(t.vy);}
     if(t.y>H-t.h-4){t.y=H-t.h-4;t.vy=-Math.abs(t.vy);}
+  });
+  for(var i=0;i<G.targets.length;i++){for(var j=i+1;j<G.targets.length;j++){
+    var a=G.targets[i],b=G.targets[j];
+    if(!ovl(a,b,0))continue;
+    var dx=(a.x+a.w/2)-(b.x+b.w/2),dy=(a.y+a.h/2)-(b.y+b.h/2);
+    var px=(a.w+b.w)/2-Math.abs(dx),py=(a.h+b.h)/2-Math.abs(dy);
+    if(px<py){var sx=dx<0?-1:1;a.x+=sx*px/2;b.x-=sx*px/2;var t1=a.vx;a.vx=b.vx;b.vx=t1;}
+    else{var sy=dy<0?-1:1;a.y+=sy*py/2;b.y-=sy*py/2;var t2=a.vy;a.vy=b.vy;b.vy=t2;}
+  }}
+  G.targets.forEach(function(t){
+    t.x=Math.max(0,Math.min(W-t.w,t.x));t.y=Math.max(0,Math.min(H-t.h-4,t.y));
     t.el.style.transform='translate('+t.x+'px,'+t.y+'px)';
   });
   G.timeLeft-=dt;setBar(G.timeLeft/G.timeMax);
@@ -583,16 +604,16 @@ function updateAim(dt){
 function resolve(id,pt){
   if(G.locked)return;
   G.locked=true;
-  var q=G.q,ok=(id!==null&&id===q.answer);
+  var q=G.q,ok=(id!==null&&String(id)===String(q.answer));
   G.targets.forEach(function(t){
-    if(t.id===q.answer)t.el.classList.add('right');
-    else if(t.id===id)t.el.classList.add('wrong');
+    if(String(t.id)===String(q.answer))t.el.classList.add('right');
+    else if(id!==null&&String(t.id)===String(id))t.el.classList.add('wrong');
   });
   if(ok){
     var gain=100+G.combo*10;
     var bonus=0;
     if(pt){
-      var tg=G.targets.filter(function(t){return t.id===id;})[0];
+      var tg=G.targets.filter(function(t){return String(t.id)===String(id);})[0];
       var cx=tg.x+tg.w/2,cy=tg.y+tg.h/2;
       if(Math.hypot(pt.x-cx,pt.y-cy)<Math.min(tg.w,tg.h)*0.3){bonus=50;}
     }
