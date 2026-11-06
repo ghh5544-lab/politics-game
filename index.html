@@ -103,6 +103,9 @@ select{background:var(--panel);border:1px solid var(--line);border-radius:8px;pa
 .err{color:var(--bad);font-size:13px;min-height:1.3em}
 .me-line{font-size:13px;color:var(--mute)}
 .me-line b{color:var(--ice)}
+.mini h3{margin:6px 0 4px;font-size:14px;font-weight:700;color:var(--ice)}
+.mini table.lb{font-size:12.5px}
+.mini table.lb td{padding:4px 8px}
 .lbtabs{display:flex;flex-wrap:wrap;gap:6px}
 .lbtabs .tab{min-height:36px;padding:6px 10px;font-size:13px}
 table.lb{width:100%;border-collapse:collapse;font-size:13.5px}
@@ -167,6 +170,11 @@ table.lb tr.r1 td.rk{color:#ffd24d}table.lb tr.r2 td.rk{color:#d5dde6}table.lb t
   <div class="row">
     <button class="btn ghost" id="quit" hidden>그만하기</button>
   </div>
+  <section class="board" id="hof" style="display:block">
+    <h2 style="font-family:var(--f-display);font-weight:400;font-size:24px;margin:0 0 8px">🏆 명예의 전당</h2>
+    <div class="lbtabs" id="hoftabs"></div>
+    <div id="hofbody" style="margin-top:8px"></div>
+  </section>
   <p class="foot">문제는 학습지에 나온 용어와 정의, OX 퀴즈 40문항만 사용합니다. 기록은 학번·이름과 함께 명예의 전당에 올라갑니다.</p>
 </div>
 
@@ -186,69 +194,69 @@ var MASK_NAME=true;
 var player=store.get('jb-player',null);
 var SLOW=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches?0.5:1;
 
-/* ---------- 데이터: [단원, 묶음, 용어, (미사용), 정의] ---------- */
+/* ---------- 데이터: [단원, 묶음, 용어, 정의] ---------- */
 var RAW=[
-[1,'hist','베스트팔렌 조약','ㅂㅅㅌㅍㄹ ㅈㅇ','1648년 30년 전쟁을 끝내며 유럽 각국이 영토적 주권과 통치권을 인정받아 근대적 주권 국가 체제를 확립한 조약'],
-[1,'hist','국제 연맹','ㄱㅈ ㅇㅁ','제1차 세계 대전 이후 창설되었으나 강대국의 불참·탈퇴로 실질적 영향력을 갖지 못한 국제기구'],
-[1,'hist','국제 연합','ㄱㅈ ㅇㅎ','제2차 세계 대전 이후 국제 연맹의 한계를 보완하여 창설된 국제기구'],
-[1,'hist','냉전','ㄴㅈ','미국 중심의 자본주의 진영과 소련 중심의 공산주의 진영이 이념적으로 대립한 상태'],
-[1,'hist','트루먼 독트린','ㅌㄹㅁ ㄷㅌㄹ','1947년 미국이 공산주의 세력의 확대를 막으려고 그리스·터키의 반공 정부에 군사·경제 원조를 제공하겠다고 밝힌 선언'],
-[1,'hist','북대서양 조약 기구','ㅂㄷㅅㅇ ㅈㅇ ㄱㄱ','미국 등 서방 진영이 결성한 군사 동맹 기구'],
-[1,'hist','바르샤바 조약 기구','ㅂㄹㅅㅂ ㅈㅇ ㄱㄱ','소련을 포함한 동유럽 공산권이 결성한 군사 동맹 기구'],
-[1,'hist','닉슨 독트린','ㄴㅅ ㄷㅌㄹ','1969년 미국이 아시아 지역에 대한 군사적 개입을 줄이겠다고 밝혀 냉전 완화의 계기가 된 선언'],
-[1,'hist','몰타 회담','ㅁㅌ ㅎㄷ','1989년 미국과 소련의 정상이 만나 냉전의 종식을 공식 선언한 회담'],
-[1,'view','세력 균형 정책','ㅅㄹ ㄱㅎ ㅈㅊ','동맹 등으로 힘의 균형을 유지해야 전쟁을 억제할 수 있다고 보는 현실주의의 평화 전략'],
-[1,'view','집단 안전 보장 체제','ㅈㄷ ㅇㅈ ㅂㅈ ㅊㅈ','국제기구·국제법을 활용해 국가들이 함께 힘을 모아 확립하는, 자유주의가 강조하는 평화 체제'],
-[1,'view','현실주의','ㅎㅅㅈㅇ','국가는 이기적인 인간들이 모인 존재이므로 자국의 이익을 최우선으로 추구하며 국가 간 갈등이 필연적이라고 보는 관점'],
-[1,'view','자유주의','ㅈㅇㅈㅇ','국가는 인간의 이성에 대한 신뢰를 바탕으로 서로 협력할 수 있는 존재라고 보는 관점'],
-[1,'now','국제 관계','ㄱㅈ ㄱㄱ','국가, 국제기구, 다국적 기업 등 다양한 행위 주체가 여러 영역에서 상호 작용하며 만들어 내는 관계들의 총체'],
-[1,'now','무정부성','ㅁㅈㅂㅅ','국가 간의 분쟁을 조정하고 문제를 해결할, 강제력을 지닌 정부가 국제 사회에 존재하지 않는 특징'],
-[1,'now','지역 블록화','ㅈㅇ ㅂㄹㅎ','지리적으로 가깝고 경제적 상호 의존도가 높은 국가들이 경제 공동체를 형성하는 현상'],
-[1,'now','탈세계화','ㅌㅅㄱㅎ','국제 사회에서 국가 간의 교류가 오히려 줄어들고 상호 의존성이 약해지는 현상'],
-[1,'now','내정 간섭','ㄴㅈ ㄱㅅ','다른 국가의 국내 문제에 강제로 개입하는 것'],
-[1,'now','힘의 논리','ㅎㅇ ㄴㄹ','주권 평등의 원칙에도 불구하고 실제로는 강대국의 뜻이 더 크게 반영되는 현상'],
-[1,'now','유럽 연합','ㅇㄹ ㅇㅎ','유럽의 여러 국가가 정치·경제적으로 통합하여 만든 대표적인 지역 국제기구'],
-[1,'now','동남아시아 국가 연합','ㄷㄴㅇㅅㅇ ㄱㄱ ㅇㅎ','동남아시아 국가들이 결성한 지역 국제기구'],
-[2,'org','정부 간 국제기구','ㅈㅂ ㄱ ㄱㅈㄱㄱ','정부(국가)를 회원으로 하는 국제기구'],
-[2,'org','국제 비정부 기구','ㄱㅈ ㅂㅈㅂ ㄱㄱ','개인이나 민간단체가 중심이 되어 만든 국제기구'],
-[2,'org','안전 보장 이사회','ㅇㅈ ㅂㅈ ㅇㅅㅎ','5개 상임 이사국과 10개 비상임 이사국으로 구성되어 국제 연합의 실질적인 의사 결정을 담당하는 기관'],
-[2,'org','국제 사법 재판소','ㄱㅈ ㅅㅂ ㅈㅍㅅ','국제법에 따라 국가 간 분쟁을 해결하는 국제 연합의 사법 기관'],
-[2,'power','권고적 효력','ㄱㄱㅈ ㅎㄹ','국제 연합 총회의 의결이 갖는, 회원국을 강제로 따르게 하지는 못하는 효력'],
-[2,'power','거부권','ㄱㅂㄱ','안전 보장 이사회에서 5개 상임 이사국 중 한 곳이라도 반대하면 안건이 부결되게 만드는 권한'],
-[2,'law','조약','ㅈㅇ','국가나 국제기구가 서로 맺은, 법적 구속력을 지닌 문서 형식의 합의'],
-[2,'law','국제 관습법','ㄱㅈ ㄱㅅㅂ','국제 사회에서 오랫동안 반복된 관행이 법적 효력을 갖게 된 규범'],
-[2,'law','입법 기관의 부재','ㅇㅂ ㄱㄱ ㅂㅈㅈ','국제 사회에 국내처럼 법을 만드는 기관이 따로 없다는 국제법의 한계'],
-[2,'law','법적 실효성의 부재','ㅂㅈ ㅅㅎㅅ ㅂㅈㅈ','국제법을 어겨도 경찰처럼 강제로 집행할 방법이 없다는 국제법의 한계'],
-[2,'prob','국제 문제','ㄱㅈ ㅁㅈ','전쟁과 테러, 환경 문제, 인권 문제, 경제 문제 등 국가 간 또는 국제 사회 전체에서 발생하는 문제'],
-[2,'prob','테러','ㅌㄹ','국가나 단체가 상대방을 위협하여 정치적 목적을 이루려는 폭력 행위'],
-[2,'prob','난민','ㄴㅁ','전쟁·박해·자연재해 등을 피해 다른 나라로 떠나는 사람들'],
-[3,'view','지정학적 관점','ㅈㅈㅎㅈ ㄱㅈ','지리적 요인을 중심으로 국제 관계를 이해하려는 관점'],
-[3,'view','역사적 관점','ㅇㅅㅈ ㄱㅈ','시대적 배경과 맥락에 초점을 맞추어 국제 관계의 변화를 이해하려는 관점'],
-[3,'view','경제적 관점','ㄱㅈㅈ ㄱㅈ','경제적 요인에 초점을 맞추어 국가 간의 관계를 이해하려는 관점'],
-[3,'term','전략적 요충지','ㅈㄹㅈ ㅇㅊㅈ','여러 세력이 눈독을 들이는, 지리적으로 중요한 위치에 있는 지역'],
-[3,'term','위안부 문제','ㅇㅇㅂ ㅁㅈ','일제가 강제로 동원한 여성들에게 인권 침해를 가한, 일본이 책임을 인정하지 않고 있는 역사 문제'],
-[3,'term','동북 공정','ㄷㅂ ㄱㅈ','중국 정부가 고조선·고구려·발해의 역사를 자국의 역사로 편입하려 한 연구 사업'],
-[3,'term','수입 의존도','ㅅㅇ ㅇㅈㄷ','한 나라가 필요한 에너지·자원 등을 다른 나라로부터 얼마나 많이 들여오는지를 나타내는 정도'],
-[3,'term','대외 의존도','ㄷㅇ ㅇㅈㄷ','한 나라의 경제가 다른 나라와의 무역 등 대외 관계에 얼마나 많이 기대고 있는지를 나타내는 정도'],
-[3,'dip','외교','ㅇㄱ','한 국가가 자국의 이익을 실현하고자 국제 사회에서 평화적인 방법으로 펼치는 모든 대외 활동'],
-[3,'dip','공공 외교','ㄱㄱ ㅇㄱ','외국 국민과 직접 소통하며 우리나라에 대한 공감대를 넓히고 국가 브랜드를 높이는 외교 활동'],
-[3,'dip','하드 파워','ㅎㄷ ㅍㅇ','군사적 개입, 경제 제재 같은 물리적 힘으로 표현되는 전통 외교의 힘'],
-[3,'dip','소프트 파워','ㅅㅍㅌ ㅍㅇ','문화·매력 등으로 상대가 자발적으로 지지하게 만드는, 공공 외교가 중시하는 힘'],
-[3,'dip','외교 다변화','ㅇㄱ ㄷㅂㅎ','세계 여러 국가와의 외교를 넓혀 협력 범위를 확대하는 것'],
-[3,'dip','공적 개발 원조','ㄱㅈ ㄱㅂ ㅇㅈ','선진국이 개발 도상국의 경제·사회 발전을 위해 제공하는 원조'],
-[4,'cause','영토 분쟁','ㅇㅌ ㅂㅈ','국경선을 두고 국가 간에 벌어지는, 국제 갈등 중 가장 물리적 충돌로 이어지기 쉬운 다툼'],
-[4,'cause','자원 분쟁','ㅈㅇ ㅂㅈ','석유·희귀 광물 등 국가가 보유한 자원이 원인이 되어 발생하는 갈등'],
-[4,'cause','자원 민족주의','ㅈㅇ ㅁㅈㅈㅇ','자원이 풍부한 국가가 그 자원을 정치적 수단으로 이용하는 태도'],
-[4,'cause','종교 분쟁','ㅈㄱ ㅂㅈ','자신의 종교에만 충실하려는 배타성과 근본주의 때문에 벌어지는 갈등'],
-[4,'cause','근본주의','ㄱㅂㅈㅇ','자기 종교만 옳다고 여겨 다른 종교를 배척하려는 태도'],
-[4,'solve','외교적 해결','ㅇㄱㅈ ㅎㄱ','분쟁 당사국끼리 자율적으로 원칙·절차에 합의하고 협상하여 해결책을 마련하는 방식'],
-[4,'solve','법적 해결','ㅂㅈ ㅎㄱ','국제 사법 재판소 등 국제기구가 국제법에 따라 분쟁을 해결하는 방식'],
-[4,'solve','대안적 해결','ㄷㅇㅈ ㅎㄱ','국제기구의 중재·조정 등을 활용해 신속하게 분쟁을 해결하는 방식'],
-[4,'glob','지속가능발전 목표','ㅈㅅㄱㄴㅂㅈ ㅁㅍ','빈곤·기후변화 등에 대응하기 위해 국제 연합이 정한 17가지 목표'],
-[4,'glob','세계시민','ㅅㄱㅅㅁ','개별 국가의 국민이면서 동시에 세계 공동체의 구성원이라는 정체성을 지닌 사람'],
-[4,'glob','세계시민 의식','ㅅㄱㅅㅁ ㅇㅅ','국가의 경계를 넘어서는 세계 공동체의 구성원으로서 권리와 의무가 있다고 인식하는 것']
+[1,'hist','베스트팔렌 조약','1648년 30년 전쟁을 끝내며 유럽 각국이 영토적 주권과 통치권을 인정받아 근대적 주권 국가 체제를 확립한 조약'],
+[1,'hist','국제 연맹','제1차 세계 대전 이후 창설되었으나 강대국의 불참·탈퇴로 실질적 영향력을 갖지 못한 국제기구'],
+[1,'hist','국제 연합','제2차 세계 대전 이후 국제 연맹의 한계를 보완하여 창설된 국제기구'],
+[1,'hist','냉전','미국 중심의 자본주의 진영과 소련 중심의 공산주의 진영이 이념적으로 대립한 상태'],
+[1,'hist','트루먼 독트린','1947년 미국이 공산주의 세력의 확대를 막으려고 그리스·터키의 반공 정부에 군사·경제 원조를 제공하겠다고 밝힌 선언'],
+[1,'hist','북대서양 조약 기구','미국 등 서방 진영이 결성한 군사 동맹 기구'],
+[1,'hist','바르샤바 조약 기구','소련을 포함한 동유럽 공산권이 결성한 군사 동맹 기구'],
+[1,'hist','닉슨 독트린','1969년 미국이 아시아 지역에 대한 군사적 개입을 줄이겠다고 밝혀 냉전 완화의 계기가 된 선언'],
+[1,'hist','몰타 회담','1989년 미국과 소련의 정상이 만나 냉전의 종식을 공식 선언한 회담'],
+[1,'view','세력 균형 정책','동맹 등으로 힘의 균형을 유지해야 전쟁을 억제할 수 있다고 보는 현실주의의 평화 전략'],
+[1,'view','집단 안전 보장 체제','국제기구·국제법을 활용해 국가들이 함께 힘을 모아 확립하는, 자유주의가 강조하는 평화 체제'],
+[1,'view','현실주의','국가는 이기적인 인간들이 모인 존재이므로 자국의 이익을 최우선으로 추구하며 국가 간 갈등이 필연적이라고 보는 관점'],
+[1,'view','자유주의','국가는 인간의 이성에 대한 신뢰를 바탕으로 서로 협력할 수 있는 존재라고 보는 관점'],
+[1,'now','국제 관계','국가, 국제기구, 다국적 기업 등 다양한 행위 주체가 여러 영역에서 상호 작용하며 만들어 내는 관계들의 총체'],
+[1,'now','무정부성','국가 간의 분쟁을 조정하고 문제를 해결할, 강제력을 지닌 정부가 국제 사회에 존재하지 않는 특징'],
+[1,'now','지역 블록화','지리적으로 가깝고 경제적 상호 의존도가 높은 국가들이 경제 공동체를 형성하는 현상'],
+[1,'now','탈세계화','국제 사회에서 국가 간의 교류가 오히려 줄어들고 상호 의존성이 약해지는 현상'],
+[1,'now','내정 간섭','다른 국가의 국내 문제에 강제로 개입하는 것'],
+[1,'now','힘의 논리','주권 평등의 원칙에도 불구하고 실제로는 강대국의 뜻이 더 크게 반영되는 현상'],
+[1,'now','유럽 연합','유럽의 여러 국가가 정치·경제적으로 통합하여 만든 대표적인 지역 국제기구'],
+[1,'now','동남아시아 국가 연합','동남아시아 국가들이 결성한 지역 국제기구'],
+[2,'org','정부 간 국제기구','정부(국가)를 회원으로 하는 국제기구'],
+[2,'org','국제 비정부 기구','개인이나 민간단체가 중심이 되어 만든 국제기구'],
+[2,'org','안전 보장 이사회','5개 상임 이사국과 10개 비상임 이사국으로 구성되어 국제 연합의 실질적인 의사 결정을 담당하는 기관'],
+[2,'org','국제 사법 재판소','국제법에 따라 국가 간 분쟁을 해결하는 국제 연합의 사법 기관'],
+[2,'power','권고적 효력','국제 연합 총회의 의결이 갖는, 회원국을 강제로 따르게 하지는 못하는 효력'],
+[2,'power','거부권','안전 보장 이사회에서 5개 상임 이사국 중 한 곳이라도 반대하면 안건이 부결되게 만드는 권한'],
+[2,'law','조약','국가나 국제기구가 서로 맺은, 법적 구속력을 지닌 문서 형식의 합의'],
+[2,'law','국제 관습법','국제 사회에서 오랫동안 반복된 관행이 법적 효력을 갖게 된 규범'],
+[2,'law','입법 기관의 부재','국제 사회에 국내처럼 법을 만드는 기관이 따로 없다는 국제법의 한계'],
+[2,'law','법적 실효성의 부재','국제법을 어겨도 경찰처럼 강제로 집행할 방법이 없다는 국제법의 한계'],
+[2,'prob','국제 문제','전쟁과 테러, 환경 문제, 인권 문제, 경제 문제 등 국가 간 또는 국제 사회 전체에서 발생하는 문제'],
+[2,'prob','테러','국가나 단체가 상대방을 위협하여 정치적 목적을 이루려는 폭력 행위'],
+[2,'prob','난민','전쟁·박해·자연재해 등을 피해 다른 나라로 떠나는 사람들'],
+[3,'view','지정학적 관점','지리적 요인을 중심으로 국제 관계를 이해하려는 관점'],
+[3,'view','역사적 관점','시대적 배경과 맥락에 초점을 맞추어 국제 관계의 변화를 이해하려는 관점'],
+[3,'view','경제적 관점','경제적 요인에 초점을 맞추어 국가 간의 관계를 이해하려는 관점'],
+[3,'term','전략적 요충지','여러 세력이 눈독을 들이는, 지리적으로 중요한 위치에 있는 지역'],
+[3,'term','위안부 문제','일제가 강제로 동원한 여성들에게 인권 침해를 가한, 일본이 책임을 인정하지 않고 있는 역사 문제'],
+[3,'term','동북 공정','중국 정부가 고조선·고구려·발해의 역사를 자국의 역사로 편입하려 한 연구 사업'],
+[3,'term','수입 의존도','한 나라가 필요한 에너지·자원 등을 다른 나라로부터 얼마나 많이 들여오는지를 나타내는 정도'],
+[3,'term','대외 의존도','한 나라의 경제가 다른 나라와의 무역 등 대외 관계에 얼마나 많이 기대고 있는지를 나타내는 정도'],
+[3,'dip','외교','한 국가가 자국의 이익을 실현하고자 국제 사회에서 평화적인 방법으로 펼치는 모든 대외 활동'],
+[3,'dip','공공 외교','외국 국민과 직접 소통하며 우리나라에 대한 공감대를 넓히고 국가 브랜드를 높이는 외교 활동'],
+[3,'dip','하드 파워','군사적 개입, 경제 제재 같은 물리적 힘으로 표현되는 전통 외교의 힘'],
+[3,'dip','소프트 파워','문화·매력 등으로 상대가 자발적으로 지지하게 만드는, 공공 외교가 중시하는 힘'],
+[3,'dip','외교 다변화','세계 여러 국가와의 외교를 넓혀 협력 범위를 확대하는 것'],
+[3,'dip','공적 개발 원조','선진국이 개발 도상국의 경제·사회 발전을 위해 제공하는 원조'],
+[4,'cause','영토 분쟁','국경선을 두고 국가 간에 벌어지는, 국제 갈등 중 가장 물리적 충돌로 이어지기 쉬운 다툼'],
+[4,'cause','자원 분쟁','석유·희귀 광물 등 국가가 보유한 자원이 원인이 되어 발생하는 갈등'],
+[4,'cause','자원 민족주의','자원이 풍부한 국가가 그 자원을 정치적 수단으로 이용하는 태도'],
+[4,'cause','종교 분쟁','자신의 종교에만 충실하려는 배타성과 근본주의 때문에 벌어지는 갈등'],
+[4,'cause','근본주의','자기 종교만 옳다고 여겨 다른 종교를 배척하려는 태도'],
+[4,'solve','외교적 해결','분쟁 당사국끼리 자율적으로 원칙·절차에 합의하고 협상하여 해결책을 마련하는 방식'],
+[4,'solve','법적 해결','국제 사법 재판소 등 국제기구가 국제법에 따라 분쟁을 해결하는 방식'],
+[4,'solve','대안적 해결','국제기구의 중재·조정 등을 활용해 신속하게 분쟁을 해결하는 방식'],
+[4,'glob','지속가능발전 목표','빈곤·기후변화 등에 대응하기 위해 국제 연합이 정한 17가지 목표'],
+[4,'glob','세계시민','개별 국가의 국민이면서 동시에 세계 공동체의 구성원이라는 정체성을 지닌 사람'],
+[4,'glob','세계시민 의식','국가의 경계를 넘어서는 세계 공동체의 구성원으로서 권리와 의무가 있다고 인식하는 것']
 ];
-var TERMS=RAW.map(function(r,i){return {id:i,unit:r[0],g:r[0]+r[1],name:r[2],init:r[3],def:r[4]};});
+var TERMS=RAW.map(function(r,i){return {id:i,unit:r[0],g:r[0]+r[1],name:r[2],def:r[3]};});
 
 /* 학습지 OX 퀴즈 40문항 (정답 포함) */
 var OXQ=[
@@ -409,29 +417,22 @@ function showLogin(msg){
    '<label class="fld">학번 (숫자 4~5자리, 예: 20301)<input id="pid" inputmode="numeric" maxlength="5" autocomplete="off" value="'+(player?esc(player.id):'')+'"></label>'+
    '<label class="fld">이름 (한글)<input id="pnm" maxlength="5" autocomplete="off" value="'+(player?esc(player.name):'')+'"></label>'+
    '<div class="err" id="perr">'+(msg?esc(msg):'')+'</div>'+
-   '<div class="row"><button class="btn" id="preg">등록하고 입장</button><button class="btn ghost" id="phof">명예의 전당 보기</button></div></div>';
+   '<div class="row"><button class="btn" id="preg">등록하고 입장</button></div>'+miniBoardHtml()+'</div>';
+  fillMini();
   $('#preg').onclick=function(){
     var id=$('#pid').value.trim(),nm=$('#pnm').value.trim();
     if(!/^[0-9]{4,5}$/.test(id)){$('#perr').textContent='학번은 숫자 4~5자리로 입력하세요.';return;}
     if(!/^[가-힣]{2,5}$/.test(nm)){$('#perr').textContent='이름은 한글 2~5자로 입력하세요.';return;}
     player={id:id,name:nm};store.set('jb-player',player);showStart();
   };
-  $('#phof').onclick=function(){showHall('aim:score');};
   $('#pnm').addEventListener('keydown',function(e){if(e.key==='Enter')$('#preg').click();});
 }
 var HOF_TABS=[['aim:score','조준 점수'],['ox:score','OX 점수'],['wave:score','격파 점수'],['wave:time','격파 최단시간']];
-function showHall(tab){
-  if(G.running)return;
-  tab=tab||'aim:score';
+var hofTab='aim:score';
+function renderBoard(box,tab,limit){
   var mode=tab.split(':')[0],kind=tab.split(':')[1];
-  ov.style.display='flex';
-  ov.innerHTML='<div class="box"><h2>명예의 전당</h2><div class="lbtabs">'+
-    HOF_TABS.map(function(t){return '<button class="tab" data-t="'+t[0]+'" aria-pressed="'+(t[0]===tab?'true':'false')+'">'+t[1]+'</button>';}).join('')+
-    '</div><div id="lbbody"><p>불러오는 중…</p></div><div class="row"><button class="btn ghost" id="hback">돌아가기</button></div></div>';
-  Array.prototype.forEach.call(ov.querySelectorAll('.lbtabs .tab'),function(b){b.onclick=function(){showHall(b.dataset.t);};});
-  $('#hback').onclick=function(){if(player)showStart();else showLogin();};
+  box.innerHTML='<p class="foot">불러오는 중…</p>';
   loadBoard().then(function(res){
-    var box=$('#lbbody');if(!box)return;
     var rows=res.rows.filter(function(r){return r.mode===mode&&r.kind===kind;});
     rows.sort(function(a,b){
       if(kind==='time')return (a.time-b.time)||(b.score-a.score);
@@ -440,7 +441,7 @@ function showHall(tab){
     var note=res.remote?'':'<p class="foot">'+(res.failed?'서버에 연결하지 못해 이 기기의 기록만 보여 줍니다.':'이 기기에서 한 기록만 표시됩니다.')+'</p>';
     if(!rows.length){box.innerHTML='<p>아직 기록이 없습니다. 첫 번째 주인공이 되어 보세요.</p>'+note;return;}
     var meId=player?player.id:'';
-    var top=rows.slice(0,15);
+    var top=rows.slice(0,limit);
     var meIdx=rows.findIndex(function(r){return String(r.id)===meId;});
     function line(r,i){
       var me=String(r.id)===meId;
@@ -448,10 +449,27 @@ function showHall(tab){
       var val=kind==='time'?(Number(r.time).toFixed(1)+'초'):r.score;
       return '<tr class="'+(me?'me ':'')+(i<3?'r'+(i+1):'')+'"><td class="rk">'+(i+1)+'</td><td>'+esc(r.id)+'</td><td>'+esc(nm)+'</td><td class="n">'+esc(val)+'</td><td>'+esc(UNIT_NAME[+r.unit]||'')+'</td></tr>';
     }
-    var h='<table class="lb"><thead><tr><th>순위</th><th>학번</th><th>이름</th><th class="n">'+(kind==='time'?'클리어 시간':'점수')+'</th><th>범위</th></tr></thead><tbody>'+
-      top.map(line).join('')+(meIdx>=15?'<tr><td colspan="5" class="foot">…</td></tr>'+line(rows[meIdx],meIdx):'')+'</tbody></table>';
-    box.innerHTML=h+note+'<p class="foot">같은 학번은 모드별 최고 기록만 남습니다.</p>';
+    box.innerHTML='<table class="lb"><thead><tr><th>순위</th><th>학번</th><th>이름</th><th class="n">'+(kind==='time'?'클리어 시간':'점수')+'</th><th>범위</th></tr></thead><tbody>'+
+      top.map(line).join('')+(meIdx>=limit?'<tr><td colspan="5" class="foot">…</td></tr>'+line(rows[meIdx],meIdx):'')+'</tbody></table>'+note;
   });
+}
+var HOF_TABS=[['aim:score','조준 점수'],['ox:score','OX 점수'],['wave:score','격파 점수'],['wave:time','격파 최단시간']];
+function tabFor(mode){return mode==='wave'?'wave:score':mode+':score';}
+function miniBoardHtml(){
+  var t=tabFor(G.mode);
+  return '<div class="mini"><h3>🏆 명예의 전당 TOP 5 · '+MODE_NAME[G.mode]+'</h3><div id="minihof"></div></div>';
+}
+function fillMini(){var el=$('#minihof');if(el)renderBoard(el,tabFor(G.mode),5);}
+function renderHofSection(){
+  var tabs=$('#hoftabs');
+  tabs.innerHTML=HOF_TABS.map(function(t){return '<button class="tab" data-t="'+t[0]+'" aria-pressed="'+(t[0]===hofTab?'true':'false')+'">'+t[1]+'</button>';}).join('');
+  Array.prototype.forEach.call(tabs.querySelectorAll('.tab'),function(b){b.onclick=function(){hofTab=b.dataset.t;renderHofSection();};});
+  renderBoard($('#hofbody'),hofTab,15);
+}
+function showHall(tab){
+  if(tab)hofTab=tab;
+  renderHofSection();
+  var h=$('#hof');if(h&&h.scrollIntoView)h.scrollIntoView({behavior:'smooth',block:'start'});
 }
 
 /* ---------- 오답노트 ---------- */
@@ -471,9 +489,9 @@ function showStart(){
   ov.style.display='flex';
   ov.innerHTML='<div class="box"><h2>'+m.name+'</h2><div class="me-line">출전: <b>'+esc(player.id)+' '+esc(player.name)+'</b> · <a href="#" id="chg" style="color:var(--mute)">변경</a></div><p>'+m.desc+'</p><ul>'+m.tips.map(function(t){return '<li>'+t+'</li>';}).join('')+'</ul>'+
    '<div class="stats"><div><b>'+(best[G.mode]||0)+'</b><span>최고 점수</span></div><div><b>'+wk+'</b><span>오답노트 용어</span></div></div>'+
-   '<div class="row"><button class="btn" id="go">시작</button><button class="btn ghost" id="nt">오답노트 보기</button><button class="btn ghost" id="hof2">명예의 전당</button></div><div id="ntbox"></div></div>';
+   '<div class="row"><button class="btn" id="go">시작</button><button class="btn ghost" id="nt">오답노트 보기</button></div><div id="ntbox"></div>'+miniBoardHtml()+'</div>';
+  fillMini();
   $('#chg').onclick=function(e){e.preventDefault();showLogin();};
-  $('#hof2').onclick=function(){showHall(G.mode==='wave'?'wave:score':G.mode+':score');};
   $('#go').onclick=startGame;
   $('#nt').onclick=function(){var b=$('#ntbox');b.innerHTML=b.innerHTML?'':notesHtml();};
   $('#qlabel').textContent='MISSION';$('#qtext').textContent='시작을 누르면 훈련이 시작됩니다.';$('#hint').textContent='';
@@ -500,7 +518,7 @@ function showResult(cleared){
     $('#subst').textContent='기록 저장 중…';
     submitRecord({id:player.id,name:player.name,mode:G.mode,unit:G.unit,score:G.score,time:elapsed,cleared:!!cleared}).then(function(st){
       var el=$('#subst');if(!el)return;
-      el.textContent=st==='sent'?'기록을 명예의 전당에 올렸습니다.':st==='local'?'기록을 이 기기에 저장했습니다.':'서버 전송에 실패했습니다. 이 기기에는 저장되었습니다.';
+      renderHofSection();el.textContent=st==='sent'?'기록을 명예의 전당에 올렸습니다.':st==='local'?'기록을 이 기기에 저장했습니다.':'서버 전송에 실패했습니다. 이 기기에는 저장되었습니다.';
     });
   }
   $('#qtext').textContent='훈련이 끝났습니다.';$('#hint').textContent='';
@@ -699,8 +717,9 @@ document.querySelectorAll('.tab').forEach(function(b){
   });
 });
 $('#unit').addEventListener('change',function(e){G.unit=+e.target.value;if(!G.running)showStart();else showStart();});
-$('#hofbtn').addEventListener('click',function(){showHall(G.mode==='wave'?'wave:score':G.mode+':score');});
+$('#hofbtn').addEventListener('click',function(){showHall(tabFor(G.mode));});
 $('#quit').addEventListener('click',function(){if(G.running)showResult(false);});
+renderHofSection();
 showStart();
 })();
 </script>
