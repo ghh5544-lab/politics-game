@@ -189,7 +189,7 @@ var store={
   set:function(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
 };
 /* 명예의 전당 서버 주소: 비워 두면 이 기기에서만 기록이 보입니다. (Apps Script 웹 앱 주소를 넣으면 전체 학생 공통 순위) */
-var LB_URL='';
+var LB_URL='https://script.google.com/macros/s/AKfycbzVPmDv8DiabqoXJRqtE_2bOIZy16DPfuKdn8WrBTnLOb0DfzOeeEGasDjQgY2NeOzS/exec';
 var MASK_NAME=true;
 var player=store.get('jb-player',null);
 var SLOW=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches?0.5:1;
